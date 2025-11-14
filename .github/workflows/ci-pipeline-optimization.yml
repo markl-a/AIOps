@@ -1,0 +1,74 @@
+name: CI Pipeline Optimization
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # Weekly on Monday
+  workflow_dispatch:
+
+jobs:
+  analyze-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install AIOps
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+
+      - name: Analyze CI/CD pipelines
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          echo "Analyzing CI/CD pipelines..."
+
+          # Analyze all workflow files
+          for workflow in .github/workflows/*.yml; do
+            echo "Analyzing $workflow..."
+            aiops optimize-pipeline "$workflow" > "${workflow}.optimization.md"
+          done
+
+      - name: Create optimization report
+        run: |
+          cat > pipeline-optimization-report.md << 'EOF'
+          # CI/CD Pipeline Optimization Report
+
+          ## Overview
+
+          This report contains AI-generated optimization recommendations for our CI/CD pipelines.
+
+          EOF
+
+          # Append all optimization reports
+          for report in .github/workflows/*.optimization.md; do
+            cat "$report" >> pipeline-optimization-report.md
+            echo "" >> pipeline-optimization-report.md
+          done
+
+      - name: Create Issue with recommendations
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('pipeline-optimization-report.md', 'utf8');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `CI/CD Pipeline Optimization Recommendations - ${new Date().toISOString().split('T')[0]}`,
+              body: report,
+              labels: ['optimization', 'ci-cd', 'ai-generated']
+            });
+
+      - name: Upload optimization report
+        uses: actions/upload-artifact@v3
+        with:
+          name: pipeline-optimization-report
+          path: pipeline-optimization-report.md

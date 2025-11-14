@@ -1,0 +1,84 @@
+name: AI Test Generation
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_path:
+        description: 'Path to file to generate tests for'
+        required: true
+        type: string
+      test_framework:
+        description: 'Test framework (pytest, unittest, etc.)'
+        required: false
+        default: 'pytest'
+        type: string
+
+  pull_request:
+    types: [labeled]
+
+jobs:
+  generate-tests:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'generate-tests')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install AIOps
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+
+      - name: Generate tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            FILE_PATH="${{ github.event.inputs.file_path }}"
+            FRAMEWORK="${{ github.event.inputs.test_framework }}"
+          else
+            # Get changed files from PR
+            FILE_PATH=$(git diff --name-only origin/${{ github.base_ref }}...${{ github.head_ref }} | grep '\.py$' | head -1)
+            FRAMEWORK="pytest"
+          fi
+
+          if [ -z "$FILE_PATH" ]; then
+            echo "No file specified"
+            exit 1
+          fi
+
+          # Generate tests
+          TEST_OUTPUT="tests/test_$(basename $FILE_PATH)"
+          aiops generate-tests "$FILE_PATH" \
+            --language python \
+            --framework "$FRAMEWORK" \
+            --output "$TEST_OUTPUT"
+
+          echo "Generated tests: $TEST_OUTPUT"
+
+      - name: Create Pull Request
+        if: github.event_name != 'pull_request'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'test: Add AI-generated tests'
+          title: 'AI-Generated Tests'
+          body: |
+            ## AI-Generated Tests
+
+            This PR contains automatically generated tests created by the AIOps framework.
+
+            **Note**: Please review these tests carefully before merging.
+
+            - [ ] Tests are comprehensive
+            - [ ] Tests cover edge cases
+            - [ ] Tests follow project conventions
+            - [ ] All tests pass
+          branch: ai-generated-tests
+          delete-branch: true
