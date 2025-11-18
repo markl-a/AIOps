@@ -1,8 +1,10 @@
-"""Caching system for AIOps framework."""
+"""Caching system for AIOps framework with Redis and file-based backends."""
 
 import hashlib
 import json
 import time
+import pickle
+import os
 from typing import Any, Optional, Callable
 from pathlib import Path
 from functools import wraps
@@ -11,26 +13,218 @@ from aiops.core.logger import get_logger
 logger = get_logger(__name__)
 
 
-class Cache:
-    """Simple file-based cache for LLM responses."""
+class CacheBackend:
+    """Base cache backend interface."""
 
-    def __init__(self, cache_dir: str = ".aiops_cache", ttl: int = 3600):
+    def get(self, key: str) -> Optional[Any]:
+        """Get value from cache."""
+        raise NotImplementedError
+
+    def set(self, key: str, value: Any, ttl: Optional[int] = None):
+        """Set value in cache."""
+        raise NotImplementedError
+
+    def delete(self, key: str):
+        """Delete key from cache."""
+        raise NotImplementedError
+
+    def exists(self, key: str) -> bool:
+        """Check if key exists."""
+        raise NotImplementedError
+
+    def clear(self):
+        """Clear all cache entries."""
+        raise NotImplementedError
+
+
+class RedisBackend(CacheBackend):
+    """Redis cache backend."""
+
+    def __init__(self, redis_url: str, prefix: str = "aiops"):
+        """Initialize Redis backend."""
+        try:
+            import redis
+            self.client = redis.from_url(redis_url, decode_responses=False)
+            self.prefix = prefix
+            self.enabled = True
+            # Test connection
+            self.client.ping()
+            logger.info(f"Redis cache backend initialized: {redis_url}")
+        except ImportError:
+            logger.warning("redis package not installed. Install with: pip install redis")
+            self.enabled = False
+            self.client = None
+        except Exception as e:
+            logger.error(f"Failed to connect to Redis: {e}")
+            self.enabled = False
+            self.client = None
+
+    def _make_key(self, key: str) -> str:
+        """Create prefixed key."""
+        return f"{self.prefix}:{key}"
+
+    def get(self, key: str) -> Optional[Any]:
+        """Get value from Redis."""
+        if not self.enabled:
+            return None
+        try:
+            value = self.client.get(self._make_key(key))
+            if value:
+                return pickle.loads(value)
+            return None
+        except Exception as e:
+            logger.error(f"Redis get error: {e}")
+            return None
+
+    def set(self, key: str, value: Any, ttl: Optional[int] = None):
+        """Set value in Redis."""
+        if not self.enabled:
+            return
+        try:
+            serialized = pickle.dumps(value)
+            if ttl:
+                self.client.setex(self._make_key(key), ttl, serialized)
+            else:
+                self.client.set(self._make_key(key), serialized)
+        except Exception as e:
+            logger.error(f"Redis set error: {e}")
+
+    def delete(self, key: str):
+        """Delete key from Redis."""
+        if not self.enabled:
+            return
+        try:
+            self.client.delete(self._make_key(key))
+        except Exception as e:
+            logger.error(f"Redis delete error: {e}")
+
+    def exists(self, key: str) -> bool:
+        """Check if key exists."""
+        if not self.enabled:
+            return False
+        try:
+            return self.client.exists(self._make_key(key)) > 0
+        except Exception as e:
+            logger.error(f"Redis exists error: {e}")
+            return False
+
+    def clear(self):
+        """Clear all keys with prefix."""
+        if not self.enabled:
+            return
+        try:
+            keys = self.client.keys(f"{self.prefix}:*")
+            if keys:
+                self.client.delete(*keys)
+        except Exception as e:
+            logger.error(f"Redis clear error: {e}")
+
+
+class FileBackend(CacheBackend):
+    """File-based cache backend."""
+
+    def __init__(self, cache_dir: Path):
+        """Initialize file backend."""
+        self.cache_dir = cache_dir
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _get_cache_path(self, key: str) -> Path:
+        """Get cache file path."""
+        return self.cache_dir / f"{key}.cache"
+
+    def get(self, key: str) -> Optional[Any]:
+        """Get value from file cache."""
+        cache_path = self._get_cache_path(key)
+        if not cache_path.exists():
+            return None
+
+        try:
+            with open(cache_path, "rb") as f:
+                data = pickle.load(f)
+
+            # Check expiration
+            if "expires_at" in data and data["expires_at"]:
+                if time.time() > data["expires_at"]:
+                    cache_path.unlink()
+                    return None
+
+            return data["value"]
+        except Exception as e:
+            logger.error(f"File cache get error: {e}")
+            return None
+
+    def set(self, key: str, value: Any, ttl: Optional[int] = None):
+        """Set value in file cache."""
+        cache_path = self._get_cache_path(key)
+
+        try:
+            data = {
+                "value": value,
+                "created_at": time.time(),
+                "expires_at": time.time() + ttl if ttl else None,
+            }
+
+            with open(cache_path, "wb") as f:
+                pickle.dump(data, f)
+        except Exception as e:
+            logger.error(f"File cache set error: {e}")
+
+    def delete(self, key: str):
+        """Delete key from file cache."""
+        cache_path = self._get_cache_path(key)
+        try:
+            if cache_path.exists():
+                cache_path.unlink()
+        except Exception as e:
+            logger.error(f"File cache delete error: {e}")
+
+    def exists(self, key: str) -> bool:
+        """Check if key exists."""
+        return self._get_cache_path(key).exists()
+
+    def clear(self):
+        """Clear all file cache entries."""
+        try:
+            for cache_file in self.cache_dir.glob("*.cache"):
+                cache_file.unlink()
+        except Exception as e:
+            logger.error(f"File cache clear error: {e}")
+
+
+class Cache:
+    """Unified cache with Redis and file-based backends."""
+
+    def __init__(self, cache_dir: str = ".aiops_cache", ttl: int = 3600, enable_redis: bool = None):
         """
         Initialize cache.
 
         Args:
             cache_dir: Directory to store cache files
             ttl: Time-to-live in seconds (default: 1 hour)
+            enable_redis: Enable Redis backend (auto-detect if None)
         """
-        self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.ttl = ttl
         self.hits = 0
         self.misses = 0
 
+        # Determine if Redis should be used
+        if enable_redis is None:
+            enable_redis = os.getenv("ENABLE_REDIS", "false").lower() == "true"
+
+        # Initialize backend
+        if enable_redis:
+            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+            self.backend = RedisBackend(redis_url)
+            if not self.backend.enabled:
+                logger.warning("Redis unavailable, falling back to file cache")
+                self.backend = FileBackend(Path(cache_dir))
+        else:
+            self.backend = FileBackend(Path(cache_dir))
+
+        logger.info(f"Cache initialized with {self.backend.__class__.__name__}")
+
     def _get_cache_key(self, *args, **kwargs) -> str:
         """Generate cache key from arguments."""
-        # Create a deterministic key from args and kwargs
         key_data = {
             "args": str(args),
             "kwargs": str(sorted(kwargs.items())),
@@ -38,75 +232,35 @@ class Cache:
         key_string = json.dumps(key_data, sort_keys=True)
         return hashlib.sha256(key_string.encode()).hexdigest()
 
-    def _get_cache_path(self, key: str) -> Path:
-        """Get cache file path for a key."""
-        return self.cache_dir / f"{key}.json"
-
     def get(self, key: str) -> Optional[Any]:
-        """
-        Get value from cache.
-
-        Args:
-            key: Cache key
-
-        Returns:
-            Cached value or None if not found/expired
-        """
-        cache_path = self._get_cache_path(key)
-
-        if not cache_path.exists():
-            self.misses += 1
-            return None
-
-        try:
-            with open(cache_path, "r") as f:
-                cached = json.load(f)
-
-            # Check if expired
-            if time.time() - cached["timestamp"] > self.ttl:
-                cache_path.unlink()  # Delete expired cache
-                self.misses += 1
-                logger.debug(f"Cache expired for key: {key[:8]}...")
-                return None
-
+        """Get value from cache."""
+        value = self.backend.get(key)
+        if value is not None:
             self.hits += 1
-            logger.debug(f"Cache hit for key: {key[:8]}...")
-            return cached["value"]
-
-        except Exception as e:
-            logger.warning(f"Error reading cache: {e}")
+            logger.debug(f"Cache hit: {key[:8]}...")
+            return value
+        else:
             self.misses += 1
+            logger.debug(f"Cache miss: {key[:8]}...")
             return None
 
-    def set(self, key: str, value: Any):
-        """
-        Set value in cache.
+    def set(self, key: str, value: Any, ttl: Optional[int] = None):
+        """Set value in cache."""
+        ttl = ttl or self.ttl
+        self.backend.set(key, value, ttl)
+        logger.debug(f"Cached value: {key[:8]}... (TTL: {ttl}s)")
 
-        Args:
-            key: Cache key
-            value: Value to cache
-        """
-        cache_path = self._get_cache_path(key)
+    def delete(self, key: str):
+        """Delete key from cache."""
+        self.backend.delete(key)
 
-        try:
-            cached = {
-                "timestamp": time.time(),
-                "value": value,
-            }
-
-            with open(cache_path, "w") as f:
-                json.dump(cached, f)
-
-            logger.debug(f"Cached value for key: {key[:8]}...")
-
-        except Exception as e:
-            logger.warning(f"Error writing cache: {e}")
+    def exists(self, key: str) -> bool:
+        """Check if key exists in cache."""
+        return self.backend.exists(key)
 
     def clear(self):
-        """Clear all cache files."""
-        for cache_file in self.cache_dir.glob("*.json"):
-            cache_file.unlink()
-
+        """Clear all cache entries."""
+        self.backend.clear()
         self.hits = 0
         self.misses = 0
         logger.info("Cache cleared")
@@ -117,11 +271,11 @@ class Cache:
         hit_rate = (self.hits / total * 100) if total > 0 else 0
 
         return {
+            "backend": self.backend.__class__.__name__,
             "hits": self.hits,
             "misses": self.misses,
             "total": total,
             "hit_rate": f"{hit_rate:.2f}%",
-            "cache_size": sum(f.stat().st_size for f in self.cache_dir.glob("*.json")),
         }
 
 
