@@ -1,0 +1,195 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiops-api
+  labels:
+    app: aiops
+    component: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: aiops
+      component: api
+  template:
+    metadata:
+      labels:
+        app: aiops
+        component: api
+    spec:
+      containers:
+      - name: api
+        image: aiops:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: ENABLE_METRICS
+          value: "true"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: aiops-secrets
+              key: database-url
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aiops-secrets
+              key: openai-api-key
+              optional: true
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aiops-secrets
+              key: anthropic-api-key
+              optional: true
+        - name: REDIS_URL
+          value: "redis://aiops-redis:6379/0"
+        - name: CELERY_BROKER_URL
+          value: "redis://aiops-redis:6379/0"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiops-worker
+  labels:
+    app: aiops
+    component: worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aiops
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: aiops
+        component: worker
+    spec:
+      containers:
+      - name: worker
+        image: aiops:latest
+        imagePullPolicy: IfNotPresent
+        command: ["celery"]
+        args:
+          - "-A"
+          - "aiops.tasks.celery_app"
+          - "worker"
+          - "--loglevel=info"
+          - "--concurrency=4"
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: aiops-secrets
+              key: database-url
+        - name: CELERY_BROKER_URL
+          value: "redis://aiops-redis:6379/0"
+        - name: CELERY_RESULT_BACKEND
+          value: "redis://aiops-redis:6379/0"
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aiops-secrets
+              key: openai-api-key
+              optional: true
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aiops-secrets
+              key: anthropic-api-key
+              optional: true
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiops-beat
+  labels:
+    app: aiops
+    component: beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aiops
+      component: beat
+  template:
+    metadata:
+      labels:
+        app: aiops
+        component: beat
+    spec:
+      containers:
+      - name: beat
+        image: aiops:latest
+        imagePullPolicy: IfNotPresent
+        command: ["celery"]
+        args:
+          - "-A"
+          - "aiops.tasks.celery_app"
+          - "beat"
+          - "--loglevel=info"
+        env:
+        - name: CELERY_BROKER_URL
+          value: "redis://aiops-redis:6379/0"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
