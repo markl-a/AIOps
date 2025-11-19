@@ -440,6 +440,29 @@ class CacheError(AIOpsException):
         )
 
 
+# Integration Errors
+class IntegrationError(AIOpsException):
+    """Base class for third-party integration errors."""
+
+    def __init__(
+        self,
+        message: str,
+        integration_name: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        integration_details = {}
+        if integration_name:
+            integration_details["integration_name"] = integration_name
+        if details:
+            integration_details.update(details)
+
+        super().__init__(
+            message=message,
+            error_code="INTEGRATION_ERROR",
+            details=integration_details,
+        )
+
+
 # Utility functions
 def handle_exception(exc: Exception) -> AIOpsException:
     """Convert standard exceptions to AIOps exceptions.
