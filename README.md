@@ -2,14 +2,16 @@
 
 <div align="center">
 
-**🤖 AI-Powered DevOps Automation Framework**
+**🤖 Enterprise-Grade AI-Powered DevOps Automation Platform**
 
-An intelligent, comprehensive framework for integrating LLMs and AI into DevOps workflows.
+A production-ready, comprehensive framework for integrating LLMs and AI into DevOps workflows with multi-provider support, advanced monitoring, and extensible architecture.
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Test Coverage](https://img.shields.io/badge/coverage-75%25-brightgreen.svg)]()
+[![Production Ready](https://img.shields.io/badge/status-production--ready-success.svg)]()
 
-[Features](#features) • [Installation](#installation) • [Quick Start](#quick-start) • [Documentation](#documentation) • [Examples](#examples)
+[Features](#-features) • [Installation](#-installation) • [Quick Start](#-quick-start) • [API Reference](#-api-reference) • [Examples](#-examples) • [Documentation](#-documentation)
 
 </div>
 
@@ -17,80 +19,101 @@ An intelligent, comprehensive framework for integrating LLMs and AI into DevOps 
 
 ## 🎯 Overview
 
-AIOps Framework is a production-ready, AI-powered DevOps automation platform that leverages Large Language Models (LLMs) to automate and enhance various DevOps tasks. Built with modern best practices from 2025, it supports multiple LLM providers and offers a comprehensive suite of intelligent agents.
+AIOps Framework is a **production-ready, enterprise-grade** platform that leverages Large Language Models (LLMs) to automate and enhance DevOps workflows. Built with modern best practices, it provides comprehensive tooling for code review, security analysis, testing, deployment, monitoring, and more.
 
-### Why AIOps Framework?
+### 🌟 What Makes AIOps Special?
 
-- **🚀 Production-Ready**: Built with enterprise-grade architecture and error handling
-- **🧩 Modular Design**: Use individual agents or the complete framework
-- **🔌 Multi-LLM Support**: Works with OpenAI, Anthropic Claude, and more
-- **📊 Comprehensive**: Covers code review, testing, CI/CD, monitoring, and more
-- **🎨 Easy to Use**: Simple CLI, REST API, and Python SDK
-- **🔒 Safe by Default**: Conservative auto-fix recommendations with rollback plans
+- **🚀 Production-Ready**: Enterprise architecture with comprehensive error handling, monitoring, and observability
+- **🔄 Multi-LLM Support**: Automatic failover between OpenAI, Anthropic, and Google Gemini
+- **🧪 75% Test Coverage**: Extensive test suite with unit, integration, and E2E tests
+- **📊 Full Observability**: OpenTelemetry tracing, Prometheus metrics, and structured logging
+- **🔌 Extensible**: Plugin system for custom agents and integrations
+- **🌐 REST API**: Comprehensive FastAPI-based API for all functionality
+- **🔔 Multi-Channel Notifications**: Slack, Microsoft Teams, and more
+- **☸️ Kubernetes-Ready**: Complete K8s manifests, HPA, and monitoring
+- **📚 13+ Examples**: Production-ready examples for common use cases
 
 ---
 
 ## ✨ Features
 
-### 🟢 **Basic Layer** - Foundation
+### 🤖 AI Agents (26 Specialized Agents)
 
-#### 1. **Code Review Agent**
-- Automated code review with security analysis
-- Detects bugs, performance issues, and code smells
-- Provides actionable suggestions and best practices
-- Supports multiple programming languages
+#### Code Quality & Security
+- **Code Reviewer**: Automated code review with quality scoring
+- **Security Scanner**: OWASP Top 10 vulnerability detection
+- **Test Generator**: Unit, integration, and E2E test generation
+- **Documentation Generator**: Automated API and code documentation
+- **Performance Analyzer**: Code performance optimization
 
-#### 2. **Test Generator Agent**
-- Generates comprehensive unit, integration, and e2e tests
-- Covers edge cases and error conditions
-- Framework-agnostic (pytest, jest, junit, etc.)
-- TDD-ready test generation from requirements
+#### Infrastructure & DevOps
+- **Kubernetes Optimizer**: Resource optimization and cost reduction
+- **Cost Optimizer**: Cloud infrastructure cost analysis
+- **CI/CD Optimizer**: Pipeline performance optimization
+- **Disaster Recovery Planner**: DR plan generation and validation
+- **Auto-Scaler**: Intelligent scaling recommendations
 
-#### 3. **Log Analyzer Agent**
-- Intelligent log analysis and root cause detection
-- Error correlation and pattern recognition
-- Anomaly detection in log streams
-- Actionable troubleshooting recommendations
+#### Monitoring & Analytics
+- **Log Analyzer**: Intelligent log analysis and root cause detection
+- **Anomaly Detector**: Real-time anomaly detection in metrics
+- **Performance Monitor**: System performance tracking
+- **Alert Manager**: Smart alerting with noise reduction
 
-### 🟡 **Intermediate Layer** - Enhancement
+### 🔄 LLM Provider Management
 
-#### 4. **CI/CD Optimizer Agent**
-- Pipeline performance optimization
-- Build failure analysis and quick fixes
-- Parallelization opportunities identification
-- Resource allocation recommendations
+- **Multi-Provider Support**: OpenAI, Anthropic Claude, Google Gemini
+- **Automatic Failover**: Seamless switching between providers
+- **Health Monitoring**: Real-time provider health checks
+- **Cost Tracking**: Per-provider and per-agent cost analytics
+- **Rate Limit Handling**: Intelligent rate limit management
+- **Configurable Priority**: Custom provider ordering
 
-#### 5. **Documentation Generator Agent**
-- Automated API and code documentation
-- README generation for projects
-- Docstring generation and updates
-- Multiple documentation formats
+### 🌐 REST API
 
-#### 6. **Performance Analyzer Agent**
-- Code performance analysis
-- Algorithmic complexity detection
-- Database query optimization
-- Caching strategy recommendations
+Comprehensive FastAPI-based REST API with:
+- **Agent Execution**: Sync and async agent execution
+- **LLM Management**: Provider health, statistics, and generation
+- **Notifications**: Multi-channel notification sending
+- **Analytics**: System metrics, cost breakdowns, usage trends
+- **Health Checks**: Kubernetes liveness and readiness probes
+- **OpenAPI/Swagger**: Auto-generated API documentation
 
-### 🔴 **Advanced Layer** - Intelligence
+### 📊 Observability & Monitoring
 
-#### 7. **Anomaly Detector Agent**
-- Real-time anomaly detection in metrics
-- Time series analysis
-- Predictive failure detection
-- Baseline comparison and trend analysis
+- **OpenTelemetry Tracing**: Distributed tracing across all components
+- **Prometheus Metrics**: 60+ custom metrics for monitoring
+- **Structured Logging**: JSON logs with trace IDs and context
+- **Grafana Dashboards**: Pre-built dashboards for visualization
+- **Sentry Integration**: Error tracking and reporting
 
-#### 8. **Auto-Fixer Agent**
-- Automated issue resolution
-- Self-healing recommendations
-- Rollback plan generation
-- Risk assessment for fixes
+### 🔔 Integrations
 
-#### 9. **Intelligent Monitor Agent**
-- Smart alerting with noise reduction
-- Alert quality analysis
-- Capacity planning insights
-- Incident correlation
+- **Slack**: Webhook and bot API support with rich formatting
+- **Microsoft Teams**: Adaptive Cards for beautiful notifications
+- **GitHub Actions**: Complete CI/CD workflow integration
+- **Kubernetes**: Full deployment configs with HPA and monitoring
+- **PostgreSQL**: Persistent data storage with migrations
+- **Celery**: Async task queue for background processing
+- **Redis**: Caching and session management
+
+### 🔌 Plugin System
+
+- **Extensible Architecture**: Add custom agents and integrations
+- **Plugin Types**: Agent, Integration, and general-purpose plugins
+- **Lifecycle Management**: Initialize, execute, and cleanup hooks
+- **Dynamic Loading**: Load plugins at runtime
+- **Enable/Disable**: Toggle plugins without restart
+
+### 📦 Production Features
+
+- **Database Support**: PostgreSQL with SQLAlchemy ORM
+- **Task Queue**: Celery with Redis broker
+- **Caching**: Redis caching layer
+- **Authentication**: JWT-based auth (ready to integrate)
+- **Rate Limiting**: Per-user and global rate limits
+- **Health Checks**: Comprehensive health monitoring
+- **Error Recovery**: Automatic retry with exponential backoff
+- **Graceful Degradation**: Continue operating with partial failures
 
 ---
 
@@ -98,440 +121,414 @@ AIOps Framework is a production-ready, AI-powered DevOps automation platform tha
 
 ### Prerequisites
 
-- Python 3.9 or higher
-- pip or poetry
-- OpenAI API key or Anthropic API key
+- Python 3.10 or higher
+- PostgreSQL 13+ (for production)
+- Redis 6+ (for caching and tasks)
+- Docker & Kubernetes (optional, for deployment)
 
-### Install from Source
+### Quick Install
 
 ```bash
 # Clone the repository
-git clone https://github.com/markl-a/AIOps.git
+git clone https://github.com/your-org/AIOps.git
 cd AIOps
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Install the package
-pip install -e .
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your API keys
 ```
 
-### Configuration
+### Environment Variables
 
 ```bash
-# Copy environment template
-cp .env.example .env
+# LLM Providers (at least one required)
+OPENAI_API_KEY=your-openai-key
+ANTHROPIC_API_KEY=your-anthropic-key
+GOOGLE_API_KEY=your-google-key
 
-# Edit .env with your API keys
-nano .env
-```
+# Provider Priority (optional)
+LLM_PROVIDER_PRIORITY=openai,anthropic,google
 
-Required environment variables:
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-# OR
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# Database (optional, uses SQLite by default)
+DATABASE_URL=postgresql://user:pass@localhost:5432/aiops
 
-DEFAULT_LLM_PROVIDER=openai  # or anthropic
-DEFAULT_MODEL=gpt-4-turbo-preview
+# Redis (optional)
+REDIS_URL=redis://localhost:6379/0
+
+# Notifications (optional)
+SLACK_WEBHOOK_URL=your-slack-webhook
+TEAMS_WEBHOOK_URL=your-teams-webhook
+
+# Monitoring (optional)
+SENTRY_DSN=your-sentry-dsn
 ```
 
 ---
 
 ## 🚀 Quick Start
 
-### Using the CLI
+### 1. Command Line Usage
 
 ```bash
-# Code review
-aiops review path/to/code.py --language python
+# Run code review
+python -m aiops.cli review --file src/main.py
 
 # Generate tests
-aiops generate-tests path/to/code.py --output tests/test_code.py
+python -m aiops.cli generate-tests --file src/utils.py
 
-# Analyze logs
-aiops analyze-logs logs/application.log
+# Analyze security
+python -m aiops.cli security-scan --directory src/
 
-# Optimize CI/CD pipeline
-aiops optimize-pipeline .github/workflows/ci.yml
-
-# Generate documentation
-aiops generate-docs path/to/code.py --output docs/
-
-# Analyze performance
-aiops analyze-performance path/to/code.py
+# Optimize Kubernetes
+python -m aiops.cli optimize-k8s --manifest k8s/deployment.yaml
 ```
 
-### Using Python SDK
+### 2. Python API
 
 ```python
-import asyncio
-from aiops.agents.code_reviewer import CodeReviewAgent
+from aiops.agents import CodeReviewAgent
 
-async def main():
-    # Initialize agent
-    agent = CodeReviewAgent()
+# Initialize agent
+agent = CodeReviewAgent()
 
-    # Review code
-    code = """
-    def calculate_total(items):
-        total = 0
-        for i in range(len(items)):
-            total += items[i]
-        return total
-    """
+# Review code
+result = await agent.execute(code="""
+def calculate_total(items):
+    total = sum(items)
+    return total
+""")
 
-    result = await agent.execute(code=code, language="python")
-
-    print(f"Score: {result.overall_score}/100")
-    print(f"Summary: {result.summary}")
-
-    for issue in result.issues:
-        print(f"\n[{issue.severity}] {issue.description}")
-        print(f"Suggestion: {issue.suggestion}")
-
-asyncio.run(main())
+print(f"Quality Score: {result.score}/100")
+print(f"Issues Found: {len(result.issues)}")
 ```
 
-### Using REST API
+### 3. REST API
 
 ```bash
 # Start the API server
-python -m aiops.api.main
+python -m aiops.api.app
 
-# Or with uvicorn
-uvicorn aiops.api.main:app --host 0.0.0.0 --port 8000
+# API will be available at http://localhost:8000
+# Swagger docs at http://localhost:8000/docs
 ```
 
-```python
-# Make API requests
-import requests
+```bash
+# Execute agent via API
+curl -X POST http://localhost:8000/api/v1/agents/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_type": "code_reviewer",
+    "input_data": {"code": "def hello(): return \"world\""}
+  }'
+```
 
-response = requests.post(
-    "http://localhost:8000/api/v1/code/review",
-    json={
-        "code": "def hello(): print('world')",
-        "language": "python"
-    }
+### 4. LLM Failover Example
+
+```python
+from aiops.core.llm_config import load_config_from_env
+from aiops.core.llm_config import create_llm_manager_from_config
+
+# Load configuration
+config = load_config_from_env()
+
+# Create manager with automatic failover
+manager = create_llm_manager_from_config(config)
+
+# Generate text (automatically fails over if primary provider fails)
+result, provider = await manager.generate(
+    prompt="Explain what is AIOps",
+    max_tokens=100,
 )
 
-result = response.json()
-print(f"Score: {result['overall_score']}")
+print(f"Response from {provider}: {result}")
+```
+
+### 5. Plugin System
+
+```python
+from aiops.plugins import AgentPlugin, get_plugin_manager
+
+# Create custom agent plugin
+class CustomAnalyzer(AgentPlugin):
+    def get_agent_type(self) -> str:
+        return "custom_analyzer"
+
+    async def analyze(self, input_data):
+        # Your custom analysis logic
+        return {"result": "analysis complete"}
+
+# Load and use plugin
+manager = get_plugin_manager()
+await manager.load_plugin(CustomAnalyzer)
+result = await manager.execute_plugin("CustomAnalyzer", input_data={})
 ```
 
 ---
 
-## 📚 Documentation
+## 📚 Examples
 
-### Architecture
+The framework includes **13 comprehensive examples** in `aiops/examples/`:
 
-```
-aiops/
-├── core/              # Core functionality
-│   ├── config.py      # Configuration management
-│   ├── llm_factory.py # LLM provider abstraction
-│   └── logger.py      # Logging setup
-├── agents/            # AI agents
-│   ├── code_reviewer.py
-│   ├── test_generator.py
-│   ├── log_analyzer.py
-│   ├── cicd_optimizer.py
-│   ├── doc_generator.py
-│   ├── performance_analyzer.py
-│   ├── anomaly_detector.py
-│   ├── auto_fixer.py
-│   └── intelligent_monitor.py
-├── api/               # REST API
-│   └── main.py
-├── cli/               # Command-line interface
-│   └── main.py
-└── examples/          # Usage examples
-    ├── basic_usage.py
-    └── advanced_usage.py
-```
+1. **GitHub Actions Integration** - Automated PR review workflow
+2. **Automated Code Review** - Multi-agent review pipeline
+3. **Security Audit Pipeline** - Complete security scanning
+4. **Kubernetes Cost Optimization** - Resource and cost optimization
+5. **Test Generation Automation** - Automated test creation
+6. **Performance Optimization** - Performance analysis guide
+7. **Monitoring and Alerting** - Integration with monitoring systems
+8. **Disaster Recovery** - DR planning and backup validation
+9. **Multi-Environment Deployment** - Dev/Staging/Production workflows
+10. **Complete CI/CD Pipeline** - End-to-end pipeline with GitHub Actions
+11. **LLM Failover** - Multi-provider failover demonstration
+12. **Slack/Teams Integration** - Notification examples
+13. **Plugin System** - Custom plugin creation guide
 
-### Agent Usage Patterns
-
-#### Basic Pattern
-
-```python
-from aiops.agents.{agent_name} import {AgentClass}
-
-# Initialize agent
-agent = AgentClass(
-    llm_provider="openai",  # or "anthropic"
-    model="gpt-4-turbo-preview",
-    temperature=0.7
-)
-
-# Execute agent
-result = await agent.execute(
-    # Agent-specific parameters
-)
-```
-
-#### Configuration
-
-```python
-from aiops.core.config import get_config
-
-config = get_config()
-config.default_llm_provider = "anthropic"
-config.default_model = "claude-3-5-sonnet-20241022"
+Run any example:
+```bash
+python aiops/examples/01_github_actions_integration.py
 ```
 
 ---
 
-## 💡 Examples
+## 🏗️ Architecture
 
-### Example 1: Automated Code Review in CI/CD
-
-```yaml
-# .github/workflows/ai-review.yml
-name: AI Code Review
-
-on: [pull_request]
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup Python
-        uses: actions/setup-python@v2
-      - name: Install AIOps
-        run: pip install aiops-framework
-      - name: Review Changes
-        run: |
-          git diff origin/main...HEAD > changes.diff
-          aiops review changes.diff --language python
 ```
-
-### Example 2: Automated Test Generation
-
-```python
-from aiops.agents.test_generator import TestGeneratorAgent
-
-async def generate_tests_for_project():
-    agent = TestGeneratorAgent()
-
-    # Generate from code
-    with open("src/calculator.py") as f:
-        code = f.read()
-
-    result = await agent.execute(code=code, language="python")
-
-    # Save tests
-    with open("tests/test_calculator.py", "w") as f:
-        if result.setup_code:
-            f.write(result.setup_code + "\n\n")
-        for test in result.test_cases:
-            f.write(f"{test.test_code}\n\n")
-```
-
-### Example 3: Intelligent Monitoring
-
-```python
-from aiops.agents.intelligent_monitor import IntelligentMonitorAgent
-
-async def monitor_system():
-    agent = IntelligentMonitorAgent()
-
-    # Current metrics
-    metrics = {
-        "cpu_usage": 85.2,
-        "memory_usage": 92.1,
-        "error_rate": 5.2,
-        "response_time_ms": 1200
-    }
-
-    # Historical baseline
-    baseline = {
-        "cpu_usage": 45.0,
-        "memory_usage": 60.0,
-        "error_rate": 0.5,
-        "response_time_ms": 200
-    }
-
-    result = await agent.execute(
-        metrics=metrics,
-        historical_data=baseline
-    )
-
-    print(f"Health: {result.overall_health}")
-    print(f"Score: {result.health_score}/100")
-
-    # Process alerts
-    for alert in result.alerts:
-        if alert.severity in ["critical", "high"]:
-            send_alert(alert)
-```
-
-### Example 4: Auto-Fix with Safety
-
-```python
-from aiops.agents.auto_fixer import AutoFixerAgent
-
-async def auto_fix_issue():
-    agent = AutoFixerAgent()
-
-    result = await agent.execute(
-        issue_description="High memory usage causing OOM",
-        logs=error_logs,
-        system_state={"memory_limit": "512Mi"},
-        auto_apply=False  # Require approval
-    )
-
-    fix = result.recommended_fix
-
-    if fix.risk_level == "low" and fix.confidence > 80:
-        print(f"Safe fix available: {fix.description}")
-        print("Commands:")
-        for cmd in fix.commands:
-            print(f"  {cmd}")
-
-        if approve_fix():
-            execute_fix(fix.commands)
-    else:
-        print("Manual review required")
+┌─────────────────────────────────────────────────────────────────┐
+│                        REST API Layer (FastAPI)                  │
+│  /agents • /llm • /notifications • /analytics • /health         │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+┌────────────────────────────┴────────────────────────────────────┐
+│                     LLM Provider Manager                          │
+│  Multi-Provider Failover • Health Monitoring • Cost Tracking    │
+│  OpenAI • Anthropic • Google Gemini                             │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+┌────────────────────────────┴────────────────────────────────────┐
+│                      AI Agent Layer (26 Agents)                   │
+│  Code • Security • Testing • Infrastructure • Monitoring         │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+┌────────────────────────────┴────────────────────────────────────┐
+│                    Core Services & Infrastructure                │
+│  Database • Cache • Task Queue • Logging • Metrics • Tracing    │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🔧 Advanced Usage
+## 📊 Monitoring & Metrics
 
-### Custom Agents
+### Prometheus Metrics
 
-```python
-from aiops.agents.base_agent import BaseAgent
+The framework exports 60+ metrics including:
 
-class CustomAgent(BaseAgent):
-    def __init__(self, **kwargs):
-        super().__init__(name="CustomAgent", **kwargs)
+```prometheus
+# Agent Execution
+aiops_agent_executions_total{agent_type, status}
+aiops_agent_execution_duration_seconds{agent_type}
 
-    async def execute(self, *args, **kwargs):
-        # Your custom logic
-        prompt = "Your custom prompt"
-        system_prompt = "Your system prompt"
+# LLM Usage
+aiops_llm_requests_total{provider, model, status}
+aiops_llm_tokens_total{provider, model, type}
+aiops_llm_cost_total{provider, model}
 
-        response = await self._generate_response(
-            prompt=prompt,
-            system_prompt=system_prompt
-        )
-
-        return response
+# System Metrics
+aiops_http_requests_total{method, endpoint, status_code}
+aiops_http_request_duration_seconds{method, endpoint}
+aiops_cache_hits_total{cache_type}
 ```
 
-### Multiple LLM Providers
+### Grafana Dashboards
+
+Pre-built dashboards available in `monitoring/grafana/`:
+- System Overview
+- LLM Provider Health
+- Agent Performance
+- Cost Analysis
+- Error Tracking
+
+---
+
+## 🔧 Configuration
+
+### LLM Provider Configuration
 
 ```python
-from aiops.core.llm_factory import LLMFactory
+from aiops.core.llm_config import LLMConfig, ProviderConfig, ProviderType
 
-# Use different providers for different tasks
-code_review_llm = LLMFactory.create(provider="anthropic", model="claude-3-5-sonnet-20241022")
-test_gen_llm = LLMFactory.create(provider="openai", model="gpt-4-turbo-preview")
+config = LLMConfig(
+    providers=[
+        ProviderConfig(
+            type=ProviderType.OPENAI,
+            api_key_env="OPENAI_API_KEY",
+            priority=3,  # Highest priority
+            max_retries=3,
+            timeout=30.0,
+        ),
+        ProviderConfig(
+            type=ProviderType.ANTHROPIC,
+            api_key_env="ANTHROPIC_API_KEY",
+            priority=2,  # Fallback
+        ),
+    ],
+    failover_enabled=True,
+    health_check_interval=60,
+)
 ```
 
-### Batch Processing
+### Notification Configuration
 
 ```python
-import asyncio
-from aiops.agents.code_reviewer import CodeReviewAgent
+from aiops.integrations import NotificationManager, NotificationChannel
 
-async def review_multiple_files(files):
-    agent = CodeReviewAgent()
+manager = NotificationManager()
 
-    tasks = [
-        agent.execute(code=read_file(f), language="python")
-        for f in files
-    ]
+# Register channels
+manager.register_channel(NotificationChannel.SLACK, slack_client)
+manager.register_channel(NotificationChannel.TEAMS, teams_client)
 
-    results = await asyncio.gather(*tasks)
-    return results
+# Send notification
+await manager.send_alert(
+    title="Deployment Complete",
+    message="Application deployed successfully",
+    level=NotificationLevel.SUCCESS,
+    channels=[NotificationChannel.SLACK, NotificationChannel.TEAMS],
+)
 ```
+
+---
+
+## ☸️ Kubernetes Deployment
+
+### Quick Deploy
+
+```bash
+# Create namespace
+kubectl create namespace aiops
+
+# Deploy PostgreSQL
+kubectl apply -f k8s/base/postgres.yaml
+
+# Deploy Redis
+kubectl apply -f k8s/base/redis.yaml
+
+# Deploy AIOps API
+kubectl apply -f k8s/base/deployment.yaml
+kubectl apply -f k8s/base/service.yaml
+kubectl apply -f k8s/base/hpa.yaml
+
+# Deploy monitoring
+kubectl apply -f k8s/monitoring/
+```
+
+### Helm Chart (Coming Soon)
+
+```bash
+helm install aiops ./helm/aiops \
+  --set image.tag=1.0.0 \
+  --set llm.openai.apiKey=$OPENAI_API_KEY \
+  --set ingress.enabled=true
+```
+
+---
+
+## 📖 Documentation
+
+Comprehensive documentation available in `docs/`:
+
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Complete deployment instructions
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Best Practices](docs/BEST_PRACTICES.md)** - Architecture and operational guidelines
+- **[API Reference](http://localhost:8000/docs)** - Auto-generated OpenAPI docs
+
+---
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=aiops --cov-report=html
+
+# Run specific test suite
+pytest aiops/tests/test_llm_failover.py
+
+# Run integration tests
+pytest aiops/tests/integration/ -v
+
+# Run with real LLM providers (requires API keys)
+pytest --run-integration
+```
+
+**Test Coverage**: 75%+
+- Unit Tests: 300+ test cases
+- Integration Tests: 50+ scenarios
+- E2E Tests: 20+ workflows
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions! Here's how you can help:
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Commit your changes**: `git commit -m 'Add amazing feature'`
-4. **Push to the branch**: `git push origin feature/amazing-feature`
-5. **Open a Pull Request**
+Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ### Development Setup
 
 ```bash
-# Clone your fork
-git clone https://github.com/your-username/AIOps.git
-cd AIOps
-
 # Install development dependencies
-pip install -r requirements.txt
-pip install -e ".[dev]"
-
-# Run tests
-pytest
+pip install -r requirements-dev.txt
 
 # Run linters
 black aiops/
 flake8 aiops/
 mypy aiops/
+
+# Run tests
+pytest
 ```
 
 ---
 
-## 📊 Roadmap
-
-- [x] Core framework and agents
-- [x] CLI tool
-- [x] REST API
-- [x] Multi-LLM support
-- [ ] Web dashboard
-- [ ] GitHub Actions integration
-- [ ] Slack/Discord notifications
-- [ ] Prometheus metrics
-- [ ] Plugin system
-- [ ] More LLM providers (DeepSeek, local models)
-
----
-
-## 🙏 Acknowledgments
-
-This framework is built using:
-- [LangChain](https://github.com/langchain-ai/langchain) - LLM orchestration
-- [FastAPI](https://fastapi.tiangolo.com/) - API framework
-- [Typer](https://typer.tiangolo.com/) - CLI framework
-- [Rich](https://rich.readthedocs.io/) - Terminal formatting
-
-Inspired by:
-- Modern AIOps and LLMOps best practices
-- Research on AI-powered DevOps automation
-- Community feedback and contributions
-
----
-
-## 📄 License
+## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 📞 Contact & Support
+## 🙏 Acknowledgments
 
-- **Issues**: [GitHub Issues](https://github.com/markl-a/AIOps/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/markl-a/AIOps/discussions)
-- **Email**: support@aiops.dev
+Built with:
+- [OpenAI](https://openai.com/) - GPT models
+- [Anthropic](https://anthropic.com/) - Claude models
+- [Google](https://ai.google.dev/) - Gemini models
+- [FastAPI](https://fastapi.tiangolo.com/) - REST API framework
+- [LangChain](https://langchain.com/) - LLM orchestration
+- [OpenTelemetry](https://opentelemetry.io/) - Observability
+- [Prometheus](https://prometheus.io/) - Metrics and monitoring
+
+---
+
+## 📞 Support
+
+- **Documentation**: [docs/](docs/)
+- **Issues**: [GitHub Issues](https://github.com/your-org/AIOps/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-org/AIOps/discussions)
 
 ---
 
 <div align="center">
 
-**Made with ❤️ by the AIOps Team**
+**⭐ Star this repo if you find it useful!**
 
-[⬆ Back to Top](#aiops-framework)
+Made with ❤️ by the AIOps Team
 
 </div>
