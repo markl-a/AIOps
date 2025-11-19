@@ -1,77 +1,160 @@
 version: '3.8'
 
 services:
-  aiops-api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: aiops-api
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: aiops-postgres
+    environment:
+      POSTGRES_DB: aiops
+      POSTGRES_USER: aiops
+      POSTGRES_PASSWORD: aiops_password
     ports:
-      - "8000:8000"
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-openai}
-      - DEFAULT_MODEL=${DEFAULT_MODEL:-gpt-4-turbo-preview}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - ENABLE_METRICS=${ENABLE_METRICS:-true}
+      - "5432:5432"
     volumes:
-      - ./logs:/app/logs
-      - ./.aiops_cache:/app/.aiops_cache
-    restart: unless-stopped
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      test: ["CMD-SHELL", "pg_isready -U aiops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  aiops-cli:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: aiops-cli
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-openai}
-    volumes:
-      - ./:/workspace
-      - ./.aiops_cache:/app/.aiops_cache
-    working_dir: /workspace
-    entrypoint: ["aiops"]
-    command: ["--help"]
-    profiles:
-      - cli
-
-  # Optional: Redis for caching (advanced)
+  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: aiops-redis
     ports:
       - "6379:6379"
     volumes:
-      - redis-data:/data
-    restart: unless-stopped
-    profiles:
-      - redis
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
-  # Optional: Prometheus for metrics
+  # AIOps API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aiops-api
+    command: uvicorn aiops.api.app:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://aiops:aiops_password@postgres:5432/aiops
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL}
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aiops-worker
+    command: celery -A aiops.tasks.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://aiops:aiops_password@postgres:5432/aiops
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Celery Beat (Scheduler)
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aiops-beat
+    command: celery -A aiops.tasks.celery_app beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://aiops:aiops_password@postgres:5432/aiops
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Prometheus
   prometheus:
     image: prom/prometheus:latest
     container_name: aiops-prometheus
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-    restart: unless-stopped
-    profiles:
-      - monitoring
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aiops-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+  # Jaeger (Distributed Tracing)
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: aiops-jaeger
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"
+      - "14250:14250"
+      - "9411:9411"
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
 
 volumes:
-  redis-data:
-  prometheus-data:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    name: aiops-network
