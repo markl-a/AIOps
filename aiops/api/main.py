@@ -10,6 +10,7 @@ import os
 from aiops import __version__
 from aiops.core.logger import setup_logger, get_logger
 from aiops.core.token_tracker import get_token_tracker
+from aiops.core.security_validator import SecurityValidator
 from aiops.agents.code_reviewer import CodeReviewAgent, CodeReviewResult
 from aiops.agents.test_generator import TestGeneratorAgent, TestSuite
 from aiops.agents.log_analyzer import LogAnalyzerAgent, LogAnalysisResult
@@ -25,6 +26,7 @@ from aiops.api.auth import (
     get_current_user,
     require_admin,
     require_user,
+    require_readonly,
     create_access_token,
     api_key_manager,
     UserRole,
@@ -44,6 +46,15 @@ logger = get_logger(__name__)
 def create_app() -> FastAPI:
     """Create FastAPI application."""
     setup_logger()
+
+    # Validate security configuration on startup
+    logger.info("Validating security configuration...")
+    try:
+        SecurityValidator.validate_and_raise()
+        logger.info("✅ Security configuration validated successfully")
+    except ValueError as e:
+        logger.error(f"❌ Security validation failed: {e}")
+        raise
 
     # Get configuration from environment
     enable_auth = os.getenv("ENABLE_AUTH", "true").lower() == "true"
@@ -187,13 +198,19 @@ def create_app() -> FastAPI:
     @app.post("/api/v1/auth/token", response_model=TokenResponse)
     async def login(request: LoginRequest):
         """
-        Create access token (for demo - implement proper user management).
+        Create access token.
 
         For production, integrate with your user management system.
         """
-        # TODO: Implement proper user authentication
-        # This is a simplified example
-        if request.username == "admin" and request.password == os.getenv("ADMIN_PASSWORD", "changeme"):
+        # Get admin password from environment (validated at startup)
+        admin_password = os.getenv("ADMIN_PASSWORD")
+        if not admin_password:
+            # This should never happen if security validation passed
+            logger.error("ADMIN_PASSWORD not set despite security validation")
+            raise HTTPException(status_code=500, detail="Server configuration error")
+
+        # Simple admin authentication (replace with proper user management in production)
+        if request.username == "admin" and request.password == admin_password:
             access_token = create_access_token(
                 data={"sub": request.username, "role": UserRole.ADMIN}
             )
@@ -201,6 +218,9 @@ def create_app() -> FastAPI:
                 access_token=access_token,
                 expires_in=60 * int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")),
             )
+
+        # Invalid credentials
+        logger.warning(f"Failed login attempt for user: {request.username}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     @app.post("/api/v1/auth/apikey", response_model=APIKeyResponse)

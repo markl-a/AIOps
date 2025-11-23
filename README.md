@@ -530,10 +530,18 @@ pytest aiops/tests/integration/ -v
 pytest --run-integration
 ```
 
-**Test Coverage**: 75%+
-- Unit Tests: 300+ test cases
-- Integration Tests: 50+ scenarios
-- E2E Tests: 20+ workflows
+**Test Coverage**: Target 70%+ (Current: ~45%)
+- Test Functions: 137 (actively expanding to 250+)
+- Test Files: 16
+- Test Code Lines: ~3,849
+
+**Coverage by Module** (as of 2024-11-23):
+- Core LLM System: ~80% ✅
+- Exception Handling: ~70% ✅
+- Agents: ~40% (improvement in progress)
+- API Endpoints: ~40% (improvement in progress)
+
+See [Testing Baseline](docs/TESTING_BASELINE.md) for details and [Testing Roadmap](docs/TESTING_ROADMAP.md) for improvement plan.
 
 ---
 
