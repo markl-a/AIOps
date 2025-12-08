@@ -1,0 +1,64 @@
+# Development dependencies for AIOps
+# Install with: pip install -r requirements-dev.txt
+
+# Include main dependencies
+-r requirements.txt
+
+# Code formatting
+black>=24.1.0
+isort>=5.13.0
+
+# Linting
+flake8>=7.0.0
+flake8-docstrings>=1.7.0
+flake8-bugbear>=24.1.0
+pylint>=3.0.0
+
+# Type checking
+mypy>=1.8.0
+types-requests>=2.31.0
+types-PyYAML>=6.0.0
+types-redis>=4.6.0
+
+# Security scanning
+bandit>=1.7.7
+safety>=2.3.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+pytest-xdist>=3.5.0  # Parallel test execution
+pytest-timeout>=2.2.0
+httpx>=0.26.0  # For async test client
+factory-boy>=3.3.0  # Test data factories
+faker>=22.0.0  # Fake data generation
+responses>=0.24.0  # Mock HTTP responses
+freezegun>=1.4.0  # Time mocking
+
+# Documentation
+mkdocs>=1.5.0
+mkdocs-material>=9.5.0
+mkdocstrings[python]>=0.24.0
+
+# Pre-commit hooks
+pre-commit>=3.6.0
+
+# Debugging
+ipdb>=0.13.0
+ipython>=8.20.0
+
+# Profiling
+memory-profiler>=0.61.0
+line-profiler>=4.1.0
+py-spy>=0.3.0
+
+# Git hooks and versioning
+bump2version>=1.0.1
+
+# API development
+httpie>=3.2.0  # CLI HTTP client
+
+# Database tools
+pgcli>=4.0.0  # PostgreSQL CLI

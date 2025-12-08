@@ -22,6 +22,7 @@ from aiops.api.routes import (
 )
 from aiops.core.exceptions import AIOpsException
 from aiops.core.structured_logger import get_structured_logger
+from aiops.core.config import get_config
 from aiops.observability.metrics import (
     http_requests_total,
     http_request_duration_seconds,
@@ -53,7 +54,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="AIOps API",
     description="AI-powered DevOps automation platform",
-    version="1.0.0",
+    version="0.1.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -62,12 +63,13 @@ app = FastAPI(
 
 
 # Middleware
+config = get_config()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=config.get_cors_origins(),
+    allow_credentials=config.cors_allow_credentials,
+    allow_methods=[config.cors_allow_methods] if config.cors_allow_methods == "*" else config.cors_allow_methods.split(","),
+    allow_headers=[config.cors_allow_headers] if config.cors_allow_headers == "*" else config.cors_allow_headers.split(","),
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -167,7 +169,7 @@ async def root() -> Dict[str, Any]:
     """Root endpoint."""
     return {
         "name": "AIOps API",
-        "version": "1.0.0",
+        "version": "0.1.0",
         "status": "running",
         "docs": "/docs",
     }
