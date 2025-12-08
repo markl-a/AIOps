@@ -36,6 +36,18 @@ class Config(BaseSettings):
     slack_webhook_url: Optional[str] = None
     discord_webhook_url: Optional[str] = None
 
+    # CORS Settings
+    cors_origins: str = "http://localhost:3000,http://localhost:8080"
+    cors_allow_credentials: bool = True
+    cors_allow_methods: str = "*"
+    cors_allow_headers: str = "*"
+
+    def get_cors_origins(self) -> list:
+        """Get CORS origins as a list."""
+        if self.cors_origins == "*":
+            return ["*"]
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
     # Feature Flags
     enable_code_review: bool = True
     enable_test_generation: bool = True
