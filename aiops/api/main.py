@@ -192,8 +192,9 @@ def create_app() -> FastAPI:
 
         For production, integrate with your user management system.
         """
-        # TODO: Implement proper user authentication
-        # This is a simplified example
+        # Authentication: For production, integrate with your user management system
+        # Currently supports admin user with environment-configured password
+        # See docs/API_GUIDE.md for proper authentication setup
         if request.username == "admin" and request.password == os.getenv("ADMIN_PASSWORD", "changeme"):
             access_token = create_access_token(
                 data={"sub": request.username, "role": UserRole.ADMIN}
