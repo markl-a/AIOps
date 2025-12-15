@@ -1,9 +1,11 @@
 """GitLab webhook handler."""
 
 from typing import Dict, Any
+import hmac
+import uuid
+
 from aiops.webhooks.webhook_handler import WebhookHandler, WebhookEvent
 from aiops.core.logger import get_logger
-import uuid
 
 logger = get_logger(__name__)
 
@@ -29,11 +31,17 @@ class GitLabWebhookHandler(WebhookHandler):
         Verify GitLab webhook token.
 
         GitLab sends token in X-Gitlab-Token header.
+        Uses constant-time comparison to prevent timing attacks.
         """
         if not self.secret:
-            return True
+            logger.warning("No secret configured for GitLab webhook verification")
+            return False
 
-        return signature == self.secret
+        if not signature:
+            return False
+
+        # Use constant-time comparison to prevent timing attacks
+        return hmac.compare_digest(signature, self.secret)
 
     def parse_event(self, headers: Dict[str, str], payload: Dict[str, Any]) -> WebhookEvent:
         """

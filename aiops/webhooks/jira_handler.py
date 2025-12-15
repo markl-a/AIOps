@@ -31,8 +31,13 @@ class JiraWebhookHandler(WebhookHandler):
 
         Jira can use HMAC SHA256 for verification.
         """
-        if not signature or not self.secret:
-            return True
+        if not self.secret:
+            logger.warning("No secret configured for Jira webhook verification")
+            return False
+
+        if not signature:
+            logger.warning("No signature provided for Jira webhook")
+            return False
 
         return self._verify_hmac_signature(
             payload=payload,

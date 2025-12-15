@@ -25,6 +25,7 @@ from aiops.api.auth import (
     get_current_user,
     require_admin,
     require_user,
+    require_readonly,
     create_access_token,
     api_key_manager,
     UserRole,

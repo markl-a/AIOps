@@ -144,8 +144,8 @@ class WebhookHandler(ABC):
             True if signature is valid
         """
         if not self.secret:
-            logger.warning("No secret configured for signature verification")
-            return True  # Skip verification if no secret
+            logger.warning("No secret configured for signature verification - rejecting request")
+            return False  # Require secret for verification
 
         # Compute expected signature
         if algorithm == "sha1":
