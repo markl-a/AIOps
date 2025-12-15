@@ -4,8 +4,8 @@ from typing import Optional, Any, Dict
 from abc import ABC, abstractmethod
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
-from langchain.schema import HumanMessage, SystemMessage, AIMessage
-from langchain.callbacks.base import BaseCallbackHandler
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from langchain_core.callbacks.base import BaseCallbackHandler
 from aiops.core.config import get_config
 from aiops.core.logger import get_logger
 from aiops.core.token_tracker import get_token_tracker

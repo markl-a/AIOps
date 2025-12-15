@@ -97,7 +97,7 @@ class Notification(BaseModel):
             NotificationLevel.SUCCESS: "Good",
             NotificationLevel.WARNING: "Warning",
             NotificationLevel.ERROR: "Attention",
-            NotificationLevel.CRITICAL": "Attention",
+            NotificationLevel.CRITICAL: "Attention",
         }
 
         icon_map = {

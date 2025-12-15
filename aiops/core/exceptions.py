@@ -116,6 +116,21 @@ class LLMTimeoutError(LLMProviderError):
         self.details["timeout_seconds"] = timeout_seconds
 
 
+class LLMAuthenticationError(LLMProviderError):
+    """Raised when LLM provider authentication fails."""
+
+    def __init__(
+        self,
+        provider: str,
+        message: str = "Authentication failed",
+    ):
+        super().__init__(
+            message=f"{provider} authentication failed: {message}",
+            provider=provider,
+        )
+        self.error_code = "LLM_AUTH_FAILED"
+
+
 class LLMResponseError(LLMProviderError):
     """Raised when LLM response is invalid or cannot be parsed."""
 
@@ -406,7 +421,7 @@ class DatabaseError(AIOpsException):
         )
 
 
-class ConnectionError(DatabaseError):
+class DatabaseConnectionError(DatabaseError):
     """Raised when database connection fails."""
 
     def __init__(
@@ -418,6 +433,10 @@ class ConnectionError(DatabaseError):
         self.error_code = "DB_CONNECTION_ERROR"
         if database:
             self.details["database"] = database
+
+
+# Alias for backwards compatibility (avoid shadowing built-in ConnectionError)
+DBConnectionError = DatabaseConnectionError
 
 
 # Cache Errors
