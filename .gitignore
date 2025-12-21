@@ -33,8 +33,14 @@ ENV/
 *~
 
 # Environment variables
+# Ignore actual environment files with secrets
 .env
 .env.local
+.env.*.local
+
+# Allow environment templates to be committed
+# .env.development
+# .env.production
 
 # Logs
 logs/
@@ -59,3 +65,9 @@ data/
 .DS_Store
 Thumbs.db
 coverage.xml
+
+# Sensitive files and secrets
+.aiops_api_keys.json
+secrets/
+*.key
+*.pem

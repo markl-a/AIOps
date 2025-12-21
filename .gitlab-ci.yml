@@ -79,6 +79,27 @@ ai_security_scan:
     expire_in: 30 days
   allow_failure: true
 
+# Run Tests with Coverage
+test:
+  stage: test
+  image: python:3.10
+  dependencies:
+    - install_aiops
+  script:
+    - source venv/bin/activate
+    - pip install -r requirements.txt
+    - pip install -r requirements-dev.txt
+    - pytest aiops/tests/ --cov=aiops --cov-fail-under=70 --cov-report=xml --cov-report=term-missing -v
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.xml
+    expire_in: 30 days
+
 # Test Generation
 ai_test_generation:
   stage: test

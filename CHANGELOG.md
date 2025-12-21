@@ -8,13 +8,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Nothing yet
+- Comprehensive optimization and development enhancements
+- Project improvements and infrastructure enhancements
+- Performance benchmark suite with detailed metrics
+- Multi-agent debugging capabilities
+- Enhanced documentation (CONTRIBUTING.md, SECURITY.md)
+- Code coverage reporting (coverage.xml)
 
 ### Changed
-- Nothing yet
+- Improved error handling in multi-agent scenarios
+- Enhanced README with Phase 7 features
+- Updated project structure for better maintainability
 
 ### Fixed
-- Nothing yet
+- Multi-agent debugging critical issues
+- Configuration drift detection bugs
+- Memory leak in long-running agent tasks
+
+## [0.1.1] - 2025-01-20
+
+### Added
+- Performance benchmark suite for all 29 agents
+- Comprehensive test coverage reporting
+- Multi-agent debugging and monitoring tools
+- Enhanced infrastructure optimization features
+- Disaster recovery validation scripts
+
+### Changed
+- Improved agent coordination and communication
+- Enhanced error handling across all agents
+- Updated dependencies for security patches
+- Optimized database query performance
+
+### Fixed
+- Memory leaks in long-running processes
+- Race conditions in concurrent agent execution
+- Configuration synchronization issues
+- Token counting accuracy in cost tracking
+
+### Security
+- Updated dependencies with security patches
+- Enhanced API key validation
+- Improved rate limiting mechanism
+- Added additional security headers
 
 ## [0.1.0] - 2024-01-15
 
@@ -73,5 +109,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Input validation
 - Audit logging
 
-[Unreleased]: https://github.com/markl-a/AIOps/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/markl-a/AIOps/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/markl-a/AIOps/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/markl-a/AIOps/releases/tag/v0.1.0

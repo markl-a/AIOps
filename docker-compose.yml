@@ -6,9 +6,9 @@ services:
     image: postgres:15-alpine
     container_name: aiops-postgres
     environment:
-      POSTGRES_DB: aiops
-      POSTGRES_USER: aiops
-      POSTGRES_PASSWORD: aiops_password
+      POSTGRES_DB: ${POSTGRES_DB:-aiops}
+      POSTGRES_USER: ${POSTGRES_USER:-aiops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -43,7 +43,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://aiops:aiops_password@postgres:5432/aiops
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-aiops}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-aiops}
       - REDIS_URL=redis://redis:6379/0
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -71,7 +71,7 @@ services:
     container_name: aiops-worker
     command: celery -A aiops.tasks.celery_app worker --loglevel=info
     environment:
-      - DATABASE_URL=postgresql://aiops:aiops_password@postgres:5432/aiops
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-aiops}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-aiops}
       - REDIS_URL=redis://redis:6379/0
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -92,7 +92,7 @@ services:
     container_name: aiops-beat
     command: celery -A aiops.tasks.celery_app beat --loglevel=info
     environment:
-      - DATABASE_URL=postgresql://aiops:aiops_password@postgres:5432/aiops
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-aiops}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-aiops}
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - .:/app
@@ -124,7 +124,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards

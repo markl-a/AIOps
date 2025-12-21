@@ -181,11 +181,12 @@ spec:
     try:
         print("\n🔟 Testing Secret Scanner...")
         from aiops.agents.secret_scanner import SecretScanner, SecretScanResult
+        import os
 
         agent = SecretScanner(llm_factory=None)
         code = """
-API_KEY = "AKIAIOSFODNN7EXAMPLE"
-PASSWORD = "mysecretpassword123"
+API_KEY = os.getenv("TEST_API_KEY", "test-key-placeholder")
+PASSWORD = os.getenv("TEST_PASSWORD", "test-password")
 """
         result = await agent.scan_code(code)
         assert isinstance(result, SecretScanResult)
