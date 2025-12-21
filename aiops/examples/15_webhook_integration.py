@@ -6,6 +6,7 @@ with external services like GitHub, GitLab, Jira, and PagerDuty.
 
 import asyncio
 import json
+import os
 from typing import Dict, Any
 
 
@@ -22,7 +23,7 @@ async def github_webhook_example():
     print("=" * 70)
 
     # Initialize handler
-    handler = GitHubWebhookHandler(secret="my-github-secret")
+    handler = GitHubWebhookHandler(secret=os.getenv("GITHUB_WEBHOOK_SECRET", "changeme"))
 
     # Register event handlers
     handler.register_handler("push", handle_push_event)
@@ -89,7 +90,7 @@ async def gitlab_webhook_example():
     print("=" * 70)
 
     # Initialize handler
-    handler = GitLabWebhookHandler(secret="my-gitlab-token")
+    handler = GitLabWebhookHandler(secret=os.getenv("GITLAB_WEBHOOK_SECRET", "changeme"))
 
     # Register event handler
     handler.register_handler("merge_request_hook", handle_merge_request_hook)
@@ -152,7 +153,7 @@ async def pagerduty_webhook_example():
     print("=" * 70)
 
     # Initialize handler
-    handler = PagerDutyWebhookHandler(secret="my-pagerduty-secret")
+    handler = PagerDutyWebhookHandler(secret=os.getenv("PAGERDUTY_WEBHOOK_SECRET", "changeme"))
 
     # Register event handler
     handler.register_handler("incident.triggered", handle_incident_triggered)
@@ -231,7 +232,7 @@ async def webhook_router_example():
     router = WebhookRouter()
 
     # Initialize handler
-    github_handler = GitHubWebhookHandler(secret="my-secret")
+    github_handler = GitHubWebhookHandler(secret=os.getenv("GITHUB_WEBHOOK_SECRET", "changeme"))
 
     # Register handler
     router.register_handler(github_handler)

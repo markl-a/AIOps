@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 from aiops.core.llm_factory import LLMFactory, BaseLLM
 from aiops.core.logger import get_logger
+from aiops.agents.prompt_generator import AgentPromptGenerator
 
 logger = get_logger(__name__)
 

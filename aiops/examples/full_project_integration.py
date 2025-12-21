@@ -172,9 +172,11 @@ async def ci_cd_integration_example():
 
         # In real scenario, read actual file
         sample_code = """
+import ast
+
 def process_user_input(user_data):
-    # Simulate processing
-    result = eval(user_data)  # Security issue!
+    # Simulate processing - use ast.literal_eval for safe evaluation
+    result = ast.literal_eval(user_data)  # Safe alternative to eval()
     return result
 """
 

@@ -6,7 +6,7 @@ from typing import Dict, Optional, List, Any
 from datetime import datetime, timedelta
 from pathlib import Path
 from dataclasses import dataclass, asdict
-from collections import defaultdict
+from collections import defaultdict, deque
 import threading
 
 from aiops.core.logger import get_logger
@@ -87,6 +87,7 @@ class TokenTracker:
         storage_file: Optional[Path] = None,
         budget_limit: Optional[float] = None,
         auto_save: bool = True,
+        max_records: int = 100000,
     ):
         """
         Initialize token tracker.
@@ -95,13 +96,15 @@ class TokenTracker:
             storage_file: File to persist usage data
             budget_limit: Optional budget limit in USD
             auto_save: Auto-save after each tracking
+            max_records: Maximum number of records to keep in memory
         """
         self.storage_file = storage_file or Path(".aiops_token_usage.json")
         self.budget_limit = budget_limit
         self.auto_save = auto_save
+        self.max_records = max_records
 
-        # In-memory storage
-        self.usage_records: List[TokenUsage] = []
+        # In-memory storage with size limit
+        self.usage_records: deque = deque(maxlen=max_records)
         self.total_cost = 0.0
         self.total_tokens = 0
 
@@ -239,14 +242,13 @@ class TokenTracker:
                     by_agent={},
                 )
 
-            # Calculate aggregates
+            # Calculate aggregates and group by model/user/agent in a single pass
             total_requests = len(records)
-            total_input_tokens = sum(r.input_tokens for r in records)
-            total_output_tokens = sum(r.output_tokens for r in records)
-            total_tokens = sum(r.total_tokens for r in records)
-            total_cost = sum(r.total_cost for r in records)
+            total_input_tokens = 0
+            total_output_tokens = 0
+            total_tokens = 0
+            total_cost = 0.0
 
-            # Group by model
             by_model = defaultdict(lambda: {
                 "requests": 0,
                 "input_tokens": 0,
@@ -254,32 +256,39 @@ class TokenTracker:
                 "total_tokens": 0,
                 "cost": 0.0
             })
+            by_user = defaultdict(lambda: {
+                "requests": 0,
+                "tokens": 0,
+                "cost": 0.0
+            })
+            by_agent = defaultdict(lambda: {
+                "requests": 0,
+                "tokens": 0,
+                "cost": 0.0
+            })
+
+            # Single pass through all records
             for r in records:
+                # Aggregate totals
+                total_input_tokens += r.input_tokens
+                total_output_tokens += r.output_tokens
+                total_tokens += r.total_tokens
+                total_cost += r.total_cost
+
+                # Group by model
                 by_model[r.model]["requests"] += 1
                 by_model[r.model]["input_tokens"] += r.input_tokens
                 by_model[r.model]["output_tokens"] += r.output_tokens
                 by_model[r.model]["total_tokens"] += r.total_tokens
                 by_model[r.model]["cost"] += r.total_cost
 
-            # Group by user
-            by_user = defaultdict(lambda: {
-                "requests": 0,
-                "tokens": 0,
-                "cost": 0.0
-            })
-            for r in records:
+                # Group by user
                 if r.user:
                     by_user[r.user]["requests"] += 1
                     by_user[r.user]["tokens"] += r.total_tokens
                     by_user[r.user]["cost"] += r.total_cost
 
-            # Group by agent
-            by_agent = defaultdict(lambda: {
-                "requests": 0,
-                "tokens": 0,
-                "cost": 0.0
-            })
-            for r in records:
+                # Group by agent
                 if r.agent:
                     by_agent[r.agent]["requests"] += 1
                     by_agent[r.agent]["tokens"] += r.total_tokens

@@ -2,7 +2,7 @@
 
 import time
 from typing import Callable, Optional, Dict
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import datetime, timedelta
 import asyncio
 
@@ -318,11 +318,13 @@ class CORSMiddleware(BaseHTTPMiddleware):
 class MetricsMiddleware(BaseHTTPMiddleware):
     """Collect basic metrics for monitoring."""
 
-    def __init__(self, app: ASGIApp):
+    def __init__(self, app: ASGIApp, max_history: int = 10000):
         """Initialize metrics middleware."""
         super().__init__(app)
+        self.max_history = max_history
+        # 使用 deque 限制历史记录大小
+        self.request_duration: Dict[str, deque] = defaultdict(lambda: deque(maxlen=self.max_history))
         self.request_count = defaultdict(int)
-        self.request_duration = defaultdict(list)
         self.error_count = defaultdict(int)
 
     async def dispatch(self, request: Request, call_next: Callable):
