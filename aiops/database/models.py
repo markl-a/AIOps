@@ -50,8 +50,8 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     role = Column(SQLEnum(UserRole), default=UserRole.USER, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
     last_login = Column(DateTime, nullable=True)
 
     # Relationships
@@ -73,7 +73,7 @@ class APIKey(Base):
     key_hash = Column(String(255), unique=True, nullable=False, index=True)
     name = Column(String(100), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
     expires_at = Column(DateTime, nullable=True)
     last_used_at = Column(DateTime, nullable=True)
 
@@ -105,7 +105,7 @@ class AgentExecution(Base):
     error_traceback = Column(Text, nullable=True)
 
     # Timing
-    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    started_at = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
     completed_at = Column(DateTime, nullable=True)
     duration_ms = Column(Float, nullable=True)
 
@@ -139,7 +139,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False, index=True)
     trace_id = Column(String(100), nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
@@ -178,7 +178,7 @@ class CostTracking(Base):
     __tablename__ = "cost_tracking"
 
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False, index=True)
     trace_id = Column(String(100), nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
@@ -219,7 +219,7 @@ class SystemMetric(Base):
     __tablename__ = "system_metrics"
 
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False, index=True)
 
     # Metric details
     metric_name = Column(String(100), nullable=False, index=True)
@@ -250,8 +250,8 @@ class Configuration(Base):
     value = Column(JSON, nullable=False)
     description = Column(Text, nullable=True)
     is_secret = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
     updated_by = Column(String(100), nullable=True)
 
     def __repr__(self):

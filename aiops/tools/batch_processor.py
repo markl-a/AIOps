@@ -70,8 +70,8 @@ class BatchProcessor:
             try:
                 logger.debug(f"Processing {file_path}...")
 
-                # Read file
-                content = file_path.read_text()
+                # Read file using asyncio.to_thread to avoid blocking event loop
+                content = await asyncio.to_thread(file_path.read_text)
 
                 # Process with function
                 result = await processor_func(code=content, **kwargs)
@@ -204,14 +204,17 @@ class BatchProcessor:
                 # Generate test file name
                 test_file = output_dir / f"test_{source_file.name}"
 
-                # Write tests
-                with open(test_file, "w") as f:
-                    if test_suite.setup_code:
-                        f.write(test_suite.setup_code + "\n\n")
+                # Build test content
+                test_content = ""
+                if test_suite.setup_code:
+                    test_content += test_suite.setup_code + "\n\n"
 
-                    for test_case in test_suite.test_cases:
-                        f.write(f"# {test_case.name}\n")
-                        f.write(f"{test_case.test_code}\n\n")
+                for test_case in test_suite.test_cases:
+                    test_content += f"# {test_case.name}\n"
+                    test_content += f"{test_case.test_code}\n\n"
+
+                # Write tests using asyncio.to_thread to avoid blocking event loop
+                await asyncio.to_thread(test_file.write_text, test_content)
 
                 saved_count += 1
                 logger.info(f"Saved tests to {test_file}")
@@ -262,7 +265,7 @@ class BatchProcessor:
         results = []
 
         for dep_file, dep_type in found_deps:
-            content = dep_file.read_text()
+            content = await asyncio.to_thread(dep_file.read_text)
             result = await agent.execute(
                 dependencies=content,
                 dependency_type=dep_type,

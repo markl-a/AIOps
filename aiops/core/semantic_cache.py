@@ -122,6 +122,10 @@ class SemanticCache:
             "expirations": 0,
         }
 
+        # Cleanup tracking - run cleanup every 5 minutes (300 seconds)
+        self._last_cleanup: float = time.time()
+        self._cleanup_interval: float = 300.0  # 5 minutes
+
         # Use lock wrapper for both sync and async support
         self._lock = AsyncLockWrapper()
 
@@ -205,12 +209,17 @@ class SemanticCache:
         while len(self._cache) >= self.max_entries:
             # Remove oldest entry (first in OrderedDict)
             oldest_key = next(iter(self._cache))
+            # Clean up prompt index to prevent memory leak
+            entry = self._cache[oldest_key]
+            normalized = entry.prompt_normalized
+            if normalized in self._prompt_index:
+                del self._prompt_index[normalized]
             del self._cache[oldest_key]
             self._stats["evictions"] += 1
             logger.debug(f"Evicted cache entry: {oldest_key[:16]}...")
 
     def _cleanup_expired(self):
-        """Remove expired entries."""
+        """Remove expired entries and clean up prompt index."""
         now = time.time()
         expired_keys = [
             key for key, entry in self._cache.items()
@@ -218,6 +227,11 @@ class SemanticCache:
         ]
 
         for key in expired_keys:
+            # Clean up prompt index to prevent memory leak
+            entry = self._cache[key]
+            normalized = entry.prompt_normalized
+            if normalized in self._prompt_index:
+                del self._prompt_index[normalized]
             del self._cache[key]
             self._stats["expirations"] += 1
 
@@ -241,9 +255,11 @@ class SemanticCache:
             Cached value or None if not found
         """
         with self._lock:
-            # Clean up expired entries periodically
-            if len(self._cache) > 0 and time.time() % 60 < 1:
+            # Clean up expired entries periodically using proper time tracking
+            current_time = time.time()
+            if len(self._cache) > 0 and (current_time - self._last_cleanup) >= self._cleanup_interval:
                 self._cleanup_expired()
+                self._last_cleanup = current_time
 
             # Try exact match first
             key = self._generate_key(prompt, model, **kwargs)
@@ -318,6 +334,11 @@ class SemanticCache:
         with self._lock:
             key = self._generate_key(prompt, model, **kwargs)
             if key in self._cache:
+                # Also clean up the prompt index to prevent memory leak
+                entry = self._cache[key]
+                normalized = entry.prompt_normalized
+                if normalized in self._prompt_index:
+                    del self._prompt_index[normalized]
                 del self._cache[key]
 
     def clear(self):
@@ -391,9 +412,11 @@ class SemanticCache:
         **kwargs,
     ) -> Optional[Any]:
         """Internal sync get logic."""
-        # Clean up expired entries periodically
-        if len(self._cache) > 0 and time.time() % 60 < 1:
+        # Clean up expired entries periodically using proper time tracking
+        current_time = time.time()
+        if len(self._cache) > 0 and (current_time - self._last_cleanup) >= self._cleanup_interval:
             self._cleanup_expired()
+            self._last_cleanup = current_time
 
         # Try exact match first
         key = self._generate_key(prompt, model, **kwargs)
