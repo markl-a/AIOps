@@ -195,21 +195,37 @@ def create_app() -> FastAPI:
     @app.post("/api/v1/auth/token", response_model=TokenResponse)
     async def login(request: LoginRequest):
         """
-        Create access token (for demo - implement proper user management).
+        Create access token.
 
+        Requires ADMIN_PASSWORD environment variable to be set.
         For production, integrate with your user management system.
         """
-        # Authentication: For production, integrate with your user management system
-        # Currently supports admin user with environment-configured password
-        # See docs/API_GUIDE.md for proper authentication setup
-        if request.username == "admin" and request.password == os.getenv("ADMIN_PASSWORD", "changeme"):
+        # Get admin password from environment (required)
+        admin_password = os.getenv("ADMIN_PASSWORD")
+        if not admin_password:
+            logger.error("ADMIN_PASSWORD environment variable not configured")
+            raise HTTPException(
+                status_code=500,
+                detail="Authentication not configured. Set ADMIN_PASSWORD environment variable."
+            )
+
+        # Validate password length for security
+        if len(admin_password) < 12:
+            logger.warning("ADMIN_PASSWORD is too short (should be at least 12 characters)")
+
+        # Authenticate admin user
+        if request.username == "admin" and request.password == admin_password:
             access_token = create_access_token(
                 data={"sub": request.username, "role": UserRole.ADMIN}
             )
+            logger.info(f"Admin login successful from user: {request.username}")
             return TokenResponse(
                 access_token=access_token,
                 expires_in=60 * int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")),
             )
+
+        # Log failed attempt (without revealing which field was wrong)
+        logger.warning(f"Failed login attempt for username: {request.username}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     @app.post("/api/v1/auth/apikey", response_model=APIKeyResponse)

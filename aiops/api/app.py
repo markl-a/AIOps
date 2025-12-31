@@ -27,9 +27,16 @@ from aiops.observability.metrics import (
     http_requests_total,
     http_request_duration_seconds,
 )
+import os
 
 
 logger = get_structured_logger(__name__)
+
+
+def _is_production() -> bool:
+    """Check if running in production environment."""
+    env = os.environ.get("ENVIRONMENT", "development").lower()
+    return env in ("production", "prod")
 
 
 @asynccontextmanager
@@ -51,14 +58,19 @@ async def lifespan(app: FastAPI):
 
 
 # Create FastAPI app
+# Disable API documentation in production for security
+_in_production = _is_production()
+if _in_production:
+    logger.info("Running in production mode - API documentation disabled")
+
 app = FastAPI(
     title="AIOps API",
     description="AI-powered DevOps automation platform",
     version="0.1.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url=None if _in_production else "/docs",
+    redoc_url=None if _in_production else "/redoc",
+    openapi_url=None if _in_production else "/openapi.json",
 )
 
 
@@ -68,8 +80,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=config.get_cors_origins(),
     allow_credentials=config.cors_allow_credentials,
-    allow_methods=[config.cors_allow_methods] if config.cors_allow_methods == "*" else config.cors_allow_methods.split(","),
-    allow_headers=[config.cors_allow_headers] if config.cors_allow_headers == "*" else config.cors_allow_headers.split(","),
+    allow_methods=config.get_cors_methods(),
+    allow_headers=config.get_cors_headers(),
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -171,7 +183,8 @@ async def root() -> Dict[str, Any]:
         "name": "AIOps API",
         "version": "0.1.0",
         "status": "running",
-        "docs": "/docs",
+        "environment": "production" if _in_production else "development",
+        "docs": None if _in_production else "/docs",
     }
 
 
