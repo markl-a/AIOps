@@ -227,9 +227,21 @@ class Cache:
 
         logger.info(f"Cache initialized with {self.backend.__class__.__name__}")
 
-    def _get_cache_key(self, *args, **kwargs) -> str:
-        """Generate cache key from arguments."""
+    def _get_cache_key(self, func_module: str, func_name: str, *args, **kwargs) -> str:
+        """Generate cache key from function identity and arguments.
+
+        Args:
+            func_module: The module where the function is defined
+            func_name: The name of the function
+            *args: Positional arguments to the function
+            **kwargs: Keyword arguments to the function
+
+        Returns:
+            A unique cache key based on function identity and arguments
+        """
         key_data = {
+            "module": func_module,
+            "function": func_name,
             "args": str(args),
             "kwargs": str(sorted(kwargs.items())),
         }
@@ -314,13 +326,15 @@ def cached(ttl: Optional[int] = None):
         async def wrapper(*args, **kwargs):
             cache = get_cache(ttl=ttl) if ttl else get_cache()
 
-            # Generate cache key
-            cache_key = cache._get_cache_key(func.__name__, *args, **kwargs)
+            # Generate cache key including module to prevent collisions between
+            # different functions with the same name and arguments
+            func_module = getattr(func, '__module__', '__unknown__')
+            cache_key = cache._get_cache_key(func_module, func.__name__, *args, **kwargs)
 
             # Try to get from cache
             cached_result = cache.get(cache_key)
             if cached_result is not None:
-                logger.debug(f"Returning cached result for {func.__name__}")
+                logger.debug(f"Returning cached result for {func_module}.{func.__name__}")
                 return cached_result
 
             # Execute function

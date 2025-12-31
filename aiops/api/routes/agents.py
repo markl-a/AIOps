@@ -5,8 +5,10 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import uuid
+import traceback
 
 from aiops.core.structured_logger import get_structured_logger
+from aiops.agents.registry import agent_registry
 
 
 logger = get_structured_logger(__name__)
@@ -49,38 +51,17 @@ executions: Dict[str, Dict[str, Any]] = {}
 
 @router.get("/", response_model=AgentListResponse)
 async def list_agents():
-    """List all available agents."""
+    """List all available agents from the registry."""
+    registered_agents = agent_registry.list_agents()
+
     agents = [
         {
-            "name": "code_reviewer",
-            "description": "Reviews code for quality and security issues",
-            "category": "code_quality",
-        },
-        {
-            "name": "k8s_optimizer",
-            "description": "Optimizes Kubernetes resource configurations",
-            "category": "infrastructure",
-        },
-        {
-            "name": "security_scanner",
-            "description": "Scans code for security vulnerabilities",
-            "category": "security",
-        },
-        {
-            "name": "test_generator",
-            "description": "Generates unit and integration tests",
-            "category": "testing",
-        },
-        {
-            "name": "performance_analyzer",
-            "description": "Analyzes code and system performance",
-            "category": "performance",
-        },
-        {
-            "name": "cost_optimizer",
-            "description": "Optimizes cloud infrastructure costs",
-            "category": "cost",
-        },
+            "name": info.name,
+            "description": info.description,
+            "category": info.category,
+            "tags": info.tags,
+        }
+        for info in registered_agents
     ]
 
     return AgentListResponse(agents=agents, total=len(agents))
@@ -253,19 +234,42 @@ async def list_executions(
 
 # Helper functions
 async def _execute_agent_sync(agent_type: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute agent synchronously (mock implementation)."""
-    # In production, this would actually execute the agent
-    import asyncio
-    await asyncio.sleep(0.5)  # Simulate execution
+    """Execute agent synchronously using the agent registry."""
+    # Check if agent exists
+    if not agent_registry.has_agent(agent_type):
+        raise ValueError(f"Unknown agent type: {agent_type}")
 
-    return {
-        "status": "success",
-        "message": f"Agent {agent_type} executed successfully",
-        "data": {
-            "agent_type": agent_type,
-            "processed": True,
-        },
-    }
+    try:
+        # Get agent instance from registry (lazy-loaded)
+        agent = await agent_registry.get(agent_type)
+
+        # Execute the agent with provided input data
+        result = await agent.execute(**input_data)
+
+        # Convert result to dict if it's a Pydantic model
+        if hasattr(result, "model_dump"):
+            result_data = result.model_dump()
+        elif hasattr(result, "dict"):
+            result_data = result.dict()
+        elif isinstance(result, dict):
+            result_data = result
+        else:
+            result_data = {"result": str(result)}
+
+        return {
+            "status": "success",
+            "message": f"Agent {agent_type} executed successfully",
+            "data": result_data,
+        }
+
+    except Exception as e:
+        logger.error(
+            f"Agent execution error: {str(e)}",
+            agent_type=agent_type,
+            error=str(e),
+            traceback=traceback.format_exc(),
+        )
+        raise
 
 
 async def _execute_agent_background(

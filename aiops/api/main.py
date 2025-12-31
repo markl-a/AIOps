@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import timedelta
 import asyncio
+import hmac
 import os
 
 from aiops import __version__
@@ -38,6 +39,8 @@ from aiops.api.middleware import (
     CORSMiddleware as CustomCORSMiddleware,
     MetricsMiddleware,
 )
+from aiops.observability.tracing import init_tracing, get_tracing_manager
+from aiops.observability.metrics import get_metrics, get_metrics_content_type
 
 logger = get_logger(__name__)
 
@@ -49,7 +52,22 @@ def create_app() -> FastAPI:
     # Get configuration from environment
     enable_auth = os.getenv("ENABLE_AUTH", "true").lower() == "true"
     enable_rate_limit = os.getenv("ENABLE_RATE_LIMIT", "true").lower() == "true"
+    enable_tracing = os.getenv("ENABLE_TRACING", "true").lower() == "true"
     allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",")
+
+    # Initialize OpenTelemetry tracing
+    tracing_manager = None
+    if enable_tracing:
+        try:
+            tracing_manager = init_tracing(
+                service_name="aiops-api",
+                service_version=__version__,
+                enable_console=os.getenv("TRACING_CONSOLE", "false").lower() == "true",
+                otlp_endpoint=os.getenv("OTLP_ENDPOINT"),
+            )
+            logger.info("OpenTelemetry tracing initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize tracing: {e}")
 
     app = FastAPI(
         title="AIOps Framework API",
@@ -100,6 +118,14 @@ def create_app() -> FastAPI:
 
     # Store middleware references for metrics endpoint
     app.state.metrics_middleware = metrics_middleware
+
+    # Instrument FastAPI with OpenTelemetry
+    if tracing_manager:
+        try:
+            tracing_manager.instrument_app(app)
+            logger.info("FastAPI OpenTelemetry instrumentation enabled")
+        except Exception as e:
+            logger.warning(f"Failed to instrument FastAPI: {e}")
 
     # Request models
     class CodeReviewRequest(BaseModel):
@@ -191,6 +217,23 @@ def create_app() -> FastAPI:
         """Health check endpoint."""
         return {"status": "healthy"}
 
+    @app.get("/metrics/prometheus")
+    async def prometheus_metrics():
+        """Prometheus metrics endpoint for scraping."""
+        from fastapi.responses import Response
+        return Response(
+            content=get_metrics(),
+            media_type=get_metrics_content_type(),
+        )
+
+    @app.on_event("shutdown")
+    async def shutdown_event():
+        """Cleanup on shutdown."""
+        manager = get_tracing_manager()
+        if manager:
+            manager.shutdown()
+            logger.info("Tracing shutdown complete")
+
     # Auth Management Routes
     @app.post("/api/v1/auth/token", response_model=TokenResponse)
     async def login(request: LoginRequest):
@@ -213,8 +256,8 @@ def create_app() -> FastAPI:
         if len(admin_password) < 12:
             logger.warning("ADMIN_PASSWORD is too short (should be at least 12 characters)")
 
-        # Authenticate admin user
-        if request.username == "admin" and request.password == admin_password:
+        # Authenticate admin user (use constant-time comparison to prevent timing attacks)
+        if request.username == "admin" and hmac.compare_digest(request.password, admin_password):
             access_token = create_access_token(
                 data={"sub": request.username, "role": UserRole.ADMIN}
             )
