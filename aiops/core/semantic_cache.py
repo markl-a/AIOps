@@ -395,14 +395,39 @@ class SemanticCache:
         """
         lock = await self._lock.async_lock()
         async with lock:
-            # Run the actual get logic in thread pool for heavy operations
-            return await asyncio.to_thread(
-                self._get_sync,
-                prompt,
-                model,
-                use_semantic,
-                **kwargs,
-            )
+            # Clean up expired entries periodically using proper time tracking
+            current_time = time.time()
+            if len(self._cache) > 0 and (current_time - self._last_cleanup) >= self._cleanup_interval:
+                self._cleanup_expired()
+                self._last_cleanup = current_time
+
+            # Try exact match first
+            key = self._generate_key(prompt, model, **kwargs)
+            entry = self._cache.get(key)
+
+            if entry and time.time() - entry.created_at <= self.ttl:
+                # Move to end for LRU
+                self._cache.move_to_end(key)
+                entry.access_count += 1
+                entry.last_accessed = time.time()
+                self._stats["exact_hits"] += 1
+                logger.debug(f"Exact cache hit for key: {key[:16]}...")
+                return entry.value
+
+            # Try semantic match if enabled
+            if use_semantic and self.enable_semantic:
+                normalized = self._normalize_prompt(prompt)
+                match = self._find_semantic_match(normalized)
+
+                if match:
+                    match.access_count += 1
+                    match.last_accessed = time.time()
+                    self._cache.move_to_end(match.key)
+                    self._stats["semantic_hits"] += 1
+                    return match.value
+
+            self._stats["misses"] += 1
+            return None
 
     def _get_sync(
         self,
@@ -461,14 +486,26 @@ class SemanticCache:
         """
         lock = await self._lock.async_lock()
         async with lock:
-            await asyncio.to_thread(
-                self._set_sync,
-                prompt,
-                value,
-                model,
-                metadata,
-                **kwargs,
+            self._evict_if_needed()
+
+            key = self._generate_key(prompt, model, **kwargs)
+            normalized = self._normalize_prompt(prompt)
+
+            entry = SemanticCacheEntry(
+                key=key,
+                prompt_hash=hashlib.sha256(prompt.encode()).hexdigest(),
+                prompt_normalized=normalized,
+                value=value,
+                created_at=time.time(),
+                last_accessed=time.time(),
+                similarity_threshold=self.similarity_threshold,
+                metadata=metadata,
             )
+
+            self._cache[key] = entry
+            self._prompt_index[normalized] = key
+
+            logger.debug(f"Cached value for key: {key[:16]}...")
 
     def _set_sync(
         self,
@@ -545,16 +582,16 @@ def semantic_cached(
     def decorator(func):
         @wraps(func)
         async def wrapper(prompt: str, *args, **kwargs):
-            # Try to get from cache
-            cached_result = cache.get(prompt, model=model)
+            # Try to get from cache using async method
+            cached_result = await cache.aget(prompt, model=model)
             if cached_result is not None:
                 return cached_result
 
             # Call function
             result = await func(prompt, *args, **kwargs)
 
-            # Cache result
-            cache.set(prompt, result, model=model)
+            # Cache result using async method
+            await cache.aset(prompt, result, model=model)
 
             return result
 

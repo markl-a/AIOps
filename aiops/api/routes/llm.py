@@ -1,8 +1,9 @@
 """LLM Provider Routes"""
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Dict, Any, List, Optional
+import re
 
 from aiops.core.structured_logger import get_structured_logger
 
@@ -15,11 +16,65 @@ router = APIRouter()
 class LLMGenerateRequest(BaseModel):
     """Request to generate text with LLM."""
 
-    prompt: str = Field(..., description="Input prompt")
-    model: Optional[str] = Field(None, description="Model to use")
+    prompt: str = Field(
+        ...,
+        description="Input prompt",
+        min_length=1,
+        max_length=100000  # 100KB max prompt size
+    )
+    model: Optional[str] = Field(
+        None,
+        description="Model to use",
+        max_length=100
+    )
     max_tokens: int = Field(default=4000, ge=1, le=32000)
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    provider: Optional[str] = Field(None, description="Specific provider to use")
+    provider: Optional[str] = Field(
+        None,
+        description="Specific provider to use",
+        max_length=50
+    )
+
+    @field_validator('prompt')
+    @classmethod
+    def validate_prompt(cls, v: str) -> str:
+        """Validate and sanitize prompt."""
+        # Strip leading/trailing whitespace
+        v = v.strip()
+
+        # Ensure prompt is not empty after stripping
+        if not v:
+            raise ValueError("Prompt cannot be empty")
+
+        # Check for suspicious patterns that might indicate injection attempts
+        suspicious_patterns = [
+            r'<script[^>]*>',  # Script tags
+            r'javascript:',     # JavaScript protocol
+            r'on\w+\s*=',      # Event handlers
+        ]
+
+        for pattern in suspicious_patterns:
+            if re.search(pattern, v, re.IGNORECASE):
+                logger.warning(f"Suspicious pattern detected in prompt: {pattern}")
+                raise ValueError("Invalid characters or patterns in prompt")
+
+        return v
+
+    @field_validator('model', 'provider')
+    @classmethod
+    def validate_string_fields(cls, v: Optional[str]) -> Optional[str]:
+        """Validate string fields."""
+        if v is None:
+            return v
+
+        # Strip whitespace
+        v = v.strip()
+
+        # Only allow alphanumeric, hyphens, underscores, and dots
+        if not re.match(r'^[a-zA-Z0-9._-]+$', v):
+            raise ValueError("Field contains invalid characters")
+
+        return v
 
 
 class LLMGenerateResponse(BaseModel):
@@ -121,6 +176,20 @@ async def get_providers_health():
 @router.post("/providers/{provider}/health-check")
 async def check_provider_health(provider: str):
     """Run health check on a specific provider."""
+    # Validate provider name (only alphanumeric and underscores)
+    if not re.match(r'^[a-zA-Z0-9_-]+$', provider):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid provider name"
+        )
+
+    # Limit provider name length
+    if len(provider) > 50:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provider name too long"
+        )
+
     logger.info(f"Running health check for provider: {provider}")
 
     # Mock implementation

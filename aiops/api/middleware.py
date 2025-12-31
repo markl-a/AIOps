@@ -96,10 +96,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             if isinstance(user, dict):
                 return f"user:{user.get('username', 'unknown')}"
 
-        # Try API key
+        # Try API key - use full hash instead of prefix to avoid collisions
         api_key = request.headers.get("X-API-Key")
         if api_key:
-            return f"apikey:{api_key[:16]}"
+            # Hash the full API key for secure, collision-free identification
+            import hashlib
+            key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+            return f"apikey:{key_hash}"
 
         # Fallback to IP
         client_ip = request.client.host if request.client else "unknown"

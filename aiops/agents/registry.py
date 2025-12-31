@@ -380,6 +380,10 @@ class AgentRegistry:
         """Check if agent is registered."""
         return name in self._registry
 
+    def has_agent(self, name: str) -> bool:
+        """Check if agent is registered (alias for is_registered)."""
+        return self.is_registered(name)
+
     def is_loaded(self, name: str) -> bool:
         """Check if agent is loaded."""
         return name in self._classes

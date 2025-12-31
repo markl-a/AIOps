@@ -1,11 +1,15 @@
 """Notification system for AIOps framework."""
 
 import aiohttp
+import asyncio
 from typing import Dict, Any, Optional
 from aiops.core.logger import get_logger
 from aiops.core.config import get_config
 
 logger = get_logger(__name__)
+
+# Default timeout for HTTP requests
+DEFAULT_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10, sock_read=10)
 
 
 class NotificationService:
@@ -40,7 +44,7 @@ class NotificationService:
             payload["attachments"] = attachments
 
         try:
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=DEFAULT_TIMEOUT) as session:
                 async with session.post(webhook_url, json=payload) as response:
                     if response.status == 200:
                         logger.info("Slack notification sent successfully")
@@ -49,6 +53,9 @@ class NotificationService:
                         logger.error(f"Slack notification failed: {response.status}")
                         return False
 
+        except asyncio.TimeoutError:
+            logger.error("Slack notification timed out")
+            return False
         except Exception as e:
             logger.error(f"Error sending Slack notification: {e}")
             return False
@@ -82,7 +89,7 @@ class NotificationService:
             payload["embeds"] = embeds
 
         try:
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=DEFAULT_TIMEOUT) as session:
                 async with session.post(webhook_url, json=payload) as response:
                     if response.status in [200, 204]:
                         logger.info("Discord notification sent successfully")
@@ -91,6 +98,9 @@ class NotificationService:
                         logger.error(f"Discord notification failed: {response.status}")
                         return False
 
+        except asyncio.TimeoutError:
+            logger.error("Discord notification timed out")
+            return False
         except Exception as e:
             logger.error(f"Error sending Discord notification: {e}")
             return False
@@ -115,7 +125,7 @@ class NotificationService:
         headers = headers or {"Content-Type": "application/json"}
 
         try:
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=DEFAULT_TIMEOUT) as session:
                 async with session.post(url, json=payload, headers=headers) as response:
                     if response.status in [200, 201, 204]:
                         logger.info(f"Webhook notification sent to {url}")
@@ -124,6 +134,9 @@ class NotificationService:
                         logger.error(f"Webhook notification failed: {response.status}")
                         return False
 
+        except asyncio.TimeoutError:
+            logger.error(f"Webhook notification to {url} timed out")
+            return False
         except Exception as e:
             logger.error(f"Error sending webhook: {e}")
             return False
@@ -157,8 +170,12 @@ class NotificationService:
             }
         ]
 
-        await NotificationService.send_slack(message, attachments=slack_attachments)
-        await NotificationService.send_discord(message)
+        # Send notifications in parallel for better performance
+        await asyncio.gather(
+            NotificationService.send_slack(message, attachments=slack_attachments),
+            NotificationService.send_discord(message),
+            return_exceptions=True
+        )
 
     @staticmethod
     async def notify_security_issue(
@@ -179,8 +196,12 @@ class NotificationService:
 {f"**File**: {file}" if file else ""}
 """
 
-        await NotificationService.send_slack(message)
-        await NotificationService.send_discord(message)
+        # Send notifications in parallel for better performance
+        await asyncio.gather(
+            NotificationService.send_slack(message),
+            NotificationService.send_discord(message),
+            return_exceptions=True
+        )
 
     @staticmethod
     async def notify_pipeline_optimization(
@@ -207,8 +228,12 @@ class NotificationService:
         for i, improvement in enumerate(improvements[:3], 1):
             message += f"{i}. {improvement}\n"
 
-        await NotificationService.send_slack(message)
-        await NotificationService.send_discord(message)
+        # Send notifications in parallel for better performance
+        await asyncio.gather(
+            NotificationService.send_slack(message),
+            NotificationService.send_discord(message),
+            return_exceptions=True
+        )
 
     @staticmethod
     async def notify_anomaly_detected(
@@ -230,8 +255,12 @@ Immediate attention may be required!
 """
 
         if severity in ["critical", "high"]:
-            await NotificationService.send_slack(message)
-            await NotificationService.send_discord(message)
+            # Send notifications in parallel for better performance
+            await asyncio.gather(
+                NotificationService.send_slack(message),
+                NotificationService.send_discord(message),
+                return_exceptions=True
+            )
 
     @staticmethod
     async def notify_test_generation(

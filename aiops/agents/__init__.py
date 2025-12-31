@@ -1,67 +1,69 @@
-"""AI Agents for DevOps automation."""
+"""AI Agents for DevOps automation.
 
+This module uses lazy loading via the agent registry.
+Import agents directly only when needed, or use the registry:
+
+    from aiops.agents.registry import agent_registry
+    agent = await agent_registry.get("code_reviewer")
+
+For direct imports (only when explicitly needed):
+    from aiops.agents.code_reviewer import CodeReviewAgent
+"""
+
+# Only export the base classes and registry - no eager loading of agents
 from aiops.agents.base_agent import BaseAgent
 from aiops.agents.prompt_generator import AgentPromptGenerator
-from aiops.agents.code_reviewer import CodeReviewAgent
-from aiops.agents.test_generator import TestGeneratorAgent
-from aiops.agents.log_analyzer import LogAnalyzerAgent
-from aiops.agents.cicd_optimizer import CICDOptimizerAgent
-from aiops.agents.doc_generator import DocGeneratorAgent
-from aiops.agents.performance_analyzer import PerformanceAnalyzerAgent
-from aiops.agents.anomaly_detector import AnomalyDetectorAgent
-from aiops.agents.auto_fixer import AutoFixerAgent
-from aiops.agents.intelligent_monitor import IntelligentMonitorAgent
-from aiops.agents.security_scanner import SecurityScannerAgent
-from aiops.agents.dependency_analyzer import DependencyAnalyzerAgent
-from aiops.agents.code_quality import CodeQualityAgent
-from aiops.agents.k8s_optimizer import KubernetesOptimizerAgent
-from aiops.agents.cost_optimizer import CloudCostOptimizer as CostOptimizerAgent
-from aiops.agents.disaster_recovery import DisasterRecoveryPlanner as DisasterRecoveryAgent
-from aiops.agents.chaos_engineer import ChaosEngineer as ChaosEngineerAgent
-from aiops.agents.db_query_analyzer import DatabaseQueryAnalyzer as DatabaseQueryAnalyzerAgent
-from aiops.agents.config_drift_detector import ConfigurationDriftDetector as ConfigDriftDetectorAgent
-from aiops.agents.container_security import ContainerSecurityScanner as ContainerSecurityAgent
-from aiops.agents.iac_validator import IaCValidator as IaCValidatorAgent
-from aiops.agents.secret_scanner import SecretScanner as SecretScannerAgent
-from aiops.agents.service_mesh_analyzer import ServiceMeshAnalyzer as ServiceMeshAnalyzerAgent
-from aiops.agents.sla_monitor import SLAComplianceMonitor as SLAMonitorAgent
-from aiops.agents.api_performance_analyzer import APIPerformanceAnalyzer as APIPerformanceAnalyzerAgent
-# New agents
-from aiops.agents.incident_response import IncidentResponseAgent
-from aiops.agents.compliance_checker import ComplianceCheckerAgent
-from aiops.agents.migration_planner import MigrationPlannerAgent
-from aiops.agents.release_manager import ReleaseManagerAgent
+from aiops.agents.registry import agent_registry, get_agent, get_agent_async, list_agents
 
 __all__ = [
     "BaseAgent",
     "AgentPromptGenerator",
-    "CodeReviewAgent",
-    "TestGeneratorAgent",
-    "LogAnalyzerAgent",
-    "CICDOptimizerAgent",
-    "DocGeneratorAgent",
-    "PerformanceAnalyzerAgent",
-    "AnomalyDetectorAgent",
-    "AutoFixerAgent",
-    "IntelligentMonitorAgent",
-    "SecurityScannerAgent",
-    "DependencyAnalyzerAgent",
-    "CodeQualityAgent",
-    "KubernetesOptimizerAgent",
-    "CostOptimizerAgent",
-    "DisasterRecoveryAgent",
-    "ChaosEngineerAgent",
-    "DatabaseQueryAnalyzerAgent",
-    "ConfigDriftDetectorAgent",
-    "ContainerSecurityAgent",
-    "IaCValidatorAgent",
-    "SecretScannerAgent",
-    "ServiceMeshAnalyzerAgent",
-    "SLAMonitorAgent",
-    "APIPerformanceAnalyzerAgent",
-    # New agents
-    "IncidentResponseAgent",
-    "ComplianceCheckerAgent",
-    "MigrationPlannerAgent",
-    "ReleaseManagerAgent",
+    "agent_registry",
+    "get_agent",
+    "get_agent_async",
+    "list_agents",
 ]
+
+# Legacy support: Define __getattr__ for backward compatibility
+# This allows: from aiops.agents import CodeReviewAgent
+# but only loads when actually accessed
+def __getattr__(name: str):
+    """Lazy load agents on attribute access for backward compatibility."""
+    # Map of legacy names to registry names
+    _AGENT_MAP = {
+        "CodeReviewAgent": "code_reviewer",
+        "TestGeneratorAgent": "test_generator",
+        "LogAnalyzerAgent": "log_analyzer",
+        "CICDOptimizerAgent": "cicd_optimizer",
+        "DocGeneratorAgent": "doc_generator",
+        "PerformanceAnalyzerAgent": "performance_analyzer",
+        "AnomalyDetectorAgent": "anomaly_detector",
+        "AutoFixerAgent": "auto_fixer",
+        "IntelligentMonitorAgent": "intelligent_monitor",
+        "SecurityScannerAgent": "security_scanner",
+        "DependencyAnalyzerAgent": "dependency_analyzer",
+        "CodeQualityAgent": "code_quality",
+        "KubernetesOptimizerAgent": "k8s_optimizer",
+        "CostOptimizerAgent": "cost_optimizer",
+        "DisasterRecoveryAgent": "disaster_recovery",
+        "ChaosEngineerAgent": "chaos_engineer",
+        "DatabaseQueryAnalyzerAgent": "db_query_analyzer",
+        "ConfigDriftDetectorAgent": "config_drift_detector",
+        "ContainerSecurityAgent": "container_security",
+        "IaCValidatorAgent": "iac_validator",
+        "SecretScannerAgent": "secret_scanner",
+        "ServiceMeshAnalyzerAgent": "service_mesh_analyzer",
+        "SLAMonitorAgent": "sla_monitor",
+        "APIPerformanceAnalyzerAgent": "api_performance_analyzer",
+        "IncidentResponseAgent": "incident_response",
+        "ComplianceCheckerAgent": "compliance_checker",
+        "MigrationPlannerAgent": "migration_planner",
+        "ReleaseManagerAgent": "release_manager",
+    }
+
+    if name in _AGENT_MAP:
+        # Get the agent class from registry (lazy loads)
+        registry_name = _AGENT_MAP[name]
+        return agent_registry.get_class(registry_name)
+
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
