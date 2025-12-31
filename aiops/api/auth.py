@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any
 import secrets
 import hashlib
 from enum import Enum
+from passlib.context import CryptContext
 
 from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
@@ -17,6 +18,9 @@ from pathlib import Path
 from aiops.core.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Password/API Key hashing context using bcrypt
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Configuration
 def _get_jwt_secret() -> str:
@@ -121,8 +125,10 @@ class APIKeyManager:
         # Generate a secure random API key
         api_key = f"aiops_{secrets.token_urlsafe(32)}"
 
-        # Hash the key for storage
-        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        # Hash the key for storage using bcrypt (more secure than SHA256)
+        # bcrypt automatically includes a salt and is designed to be slow
+        # to prevent brute force attacks
+        key_hash = pwd_context.hash(api_key)
 
         # Create API key record
         key_data = APIKey(
@@ -135,7 +141,10 @@ class APIKeyManager:
 
         # Save to storage
         keys = self._load_keys()
-        keys[key_hash] = key_data.model_dump()
+        # Use the first part of the key as a lookup ID (not the hash itself)
+        # This allows us to find the correct key record for validation
+        key_id = hashlib.sha256(api_key.encode()).hexdigest()
+        keys[key_id] = key_data.model_dump()
         self._save_keys(keys)
 
         logger.info(f"Created API key: {name} (role: {role})")
@@ -151,17 +160,27 @@ class APIKeyManager:
         Returns:
             APIKey object if valid, None otherwise
         """
-        # Hash the provided key
-        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        # Use SHA256 as a lookup key (not for security, just for finding the record)
+        key_id = hashlib.sha256(api_key.encode()).hexdigest()
 
         # Load keys and check
         keys = self._load_keys()
-        key_data = keys.get(key_hash)
+        key_data = keys.get(key_id)
 
         if not key_data:
+            logger.warning("API key not found")
             return None
 
         api_key_obj = APIKey(**key_data)
+
+        # Verify the API key using bcrypt (constant-time comparison)
+        try:
+            if not pwd_context.verify(api_key, api_key_obj.key_hash):
+                logger.warning("Invalid API key provided")
+                return None
+        except Exception as e:
+            logger.error(f"Error validating API key: {e}")
+            return None
 
         if not api_key_obj.enabled:
             logger.warning(f"Attempted use of disabled API key: {api_key_obj.name}")
@@ -169,7 +188,7 @@ class APIKeyManager:
 
         # Update last used timestamp
         api_key_obj.last_used = datetime.utcnow()
-        keys[key_hash] = api_key_obj.model_dump()
+        keys[key_id] = api_key_obj.model_dump()
         self._save_keys(keys)
 
         return api_key_obj

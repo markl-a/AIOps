@@ -513,9 +513,19 @@ class ConnectionPool:
         """
         self.max_connections = max_connections
         self.name = name
-        self._semaphore = asyncio.Semaphore(max_connections)
+        self._semaphore: Optional[asyncio.Semaphore] = None
         self._active = 0
         self._lock = threading.Lock()
+
+    def _ensure_semaphore(self):
+        """Ensure semaphore is initialized (lazy initialization)."""
+        if self._semaphore is None:
+            try:
+                self._semaphore = asyncio.Semaphore(self.max_connections)
+            except RuntimeError:
+                # No event loop running, create one
+                loop = asyncio.get_event_loop()
+                self._semaphore = asyncio.Semaphore(self.max_connections)
 
     @property
     def available(self) -> int:
@@ -524,6 +534,7 @@ class ConnectionPool:
 
     async def acquire(self):
         """Acquire a connection from the pool."""
+        self._ensure_semaphore()
         await self._semaphore.acquire()
         with self._lock:
             self._active += 1
@@ -532,7 +543,8 @@ class ConnectionPool:
         """Release a connection back to the pool."""
         with self._lock:
             self._active -= 1
-        self._semaphore.release()
+        if self._semaphore:
+            self._semaphore.release()
 
     async def __aenter__(self):
         """Context manager entry."""

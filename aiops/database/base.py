@@ -1,11 +1,12 @@
 """Database connection and session management."""
 
 from typing import Generator, Optional
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, Pool
 from loguru import logger
+import time
 
 from aiops.core.config import get_config
 from aiops.core.exceptions import DatabaseError, ConnectionError as DBConnectionError
@@ -49,6 +50,105 @@ class DatabaseManager:
 
         return f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
+    def _setup_connection_pool_listeners(self):
+        """Set up event listeners for connection pool monitoring."""
+        # Track connection pool statistics
+        pool_stats = {
+            "checkouts": 0,
+            "checkins": 0,
+            "connects": 0,
+            "disconnects": 0,
+            "invalidations": 0,
+        }
+
+        @event.listens_for(Pool, "checkout")
+        def receive_checkout(dbapi_conn, connection_record, connection_proxy):
+            """Log connection checkout from pool."""
+            pool_stats["checkouts"] += 1
+            logger.debug(
+                f"Connection checked out from pool (total checkouts: {pool_stats['checkouts']})"
+            )
+
+        @event.listens_for(Pool, "checkin")
+        def receive_checkin(dbapi_conn, connection_record):
+            """Log connection checkin to pool."""
+            pool_stats["checkins"] += 1
+            logger.debug(
+                f"Connection checked in to pool (total checkins: {pool_stats['checkins']})"
+            )
+
+        @event.listens_for(Pool, "connect")
+        def receive_connect(dbapi_conn, connection_record):
+            """Log new database connection."""
+            pool_stats["connects"] += 1
+            logger.info(
+                f"New database connection created (total connections: {pool_stats['connects']})"
+            )
+
+        @event.listens_for(Pool, "close")
+        def receive_close(dbapi_conn, connection_record):
+            """Log connection close."""
+            pool_stats["disconnects"] += 1
+            logger.debug(
+                f"Database connection closed (total disconnects: {pool_stats['disconnects']})"
+            )
+
+        @event.listens_for(Pool, "invalidate")
+        def receive_invalidate(dbapi_conn, connection_record, exception):
+            """Log connection invalidation."""
+            pool_stats["invalidations"] += 1
+            logger.warning(
+                f"Connection invalidated: {exception} "
+                f"(total invalidations: {pool_stats['invalidations']})"
+            )
+
+        # Store stats for later retrieval
+        self._pool_stats = pool_stats
+
+    def _setup_query_listeners(self):
+        """Set up event listeners for query performance monitoring."""
+        # Track slow queries
+        slow_query_threshold_ms = 1000  # 1 second
+
+        @event.listens_for(self.engine, "before_cursor_execute")
+        def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+            """Record query start time."""
+            conn.info.setdefault("query_start_time", []).append(time.time())
+
+        @event.listens_for(self.engine, "after_cursor_execute")
+        def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+            """Log slow queries."""
+            total_time = time.time() - conn.info["query_start_time"].pop(-1)
+            total_time_ms = total_time * 1000
+
+            if total_time_ms > slow_query_threshold_ms:
+                logger.warning(
+                    f"Slow query detected ({total_time_ms:.2f}ms): "
+                    f"{statement[:200]}..."
+                )
+
+    def get_pool_stats(self) -> dict:
+        """Get connection pool statistics.
+
+        Returns:
+            Dictionary with pool statistics
+        """
+        if not self.engine:
+            return {}
+
+        pool = self.engine.pool
+        return {
+            "pool_size": pool.size(),
+            "checked_in": pool.checkedin(),
+            "checked_out": pool.checkedout(),
+            "overflow": pool.overflow(),
+            "total_checkouts": self._pool_stats.get("checkouts", 0),
+            "total_checkins": self._pool_stats.get("checkins", 0),
+            "total_connections": self._pool_stats.get("connects", 0),
+            "total_disconnects": self._pool_stats.get("disconnects", 0),
+            "total_invalidations": self._pool_stats.get("invalidations", 0),
+        }
+
     def init_engine(self, **kwargs):
         """Initialize database engine.
 
@@ -75,10 +175,14 @@ class DatabaseManager:
                 "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", 3600)),  # Recycle after 1 hour
                 "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", 30)),  # Wait up to 30s for connection
                 "echo": os.getenv("DB_ECHO", "false").lower() == "true",
+                # Enable query statistics for PostgreSQL
+                "echo_pool": os.getenv("DB_ECHO_POOL", "false").lower() == "true",
                 # Connection arguments for better reliability
                 "connect_args": {
                     "connect_timeout": 10,  # Connection timeout in seconds
                     "application_name": "aiops",  # Identify in pg_stat_activity
+                    # Enable server-side prepared statements for better performance
+                    "options": "-c statement_timeout=30000",  # 30 second query timeout
                 },
             }
 
@@ -94,6 +198,10 @@ class DatabaseManager:
             engine_args.update(kwargs)
 
             self.engine = create_engine(self.database_url, **engine_args)
+
+            # Set up connection pool and query listeners
+            self._setup_connection_pool_listeners()
+            self._setup_query_listeners()
 
             # Create session factory
             self.SessionLocal = sessionmaker(

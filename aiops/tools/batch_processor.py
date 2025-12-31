@@ -20,7 +20,25 @@ class BatchProcessor:
             max_concurrent: Maximum concurrent operations
         """
         self.max_concurrent = max_concurrent
-        self.semaphore = asyncio.Semaphore(max_concurrent)
+        self._semaphore: Optional[asyncio.Semaphore] = None
+
+    def _ensure_semaphore(self):
+        """Ensure semaphore is initialized (lazy initialization)."""
+        if self._semaphore is None:
+            try:
+                self._semaphore = asyncio.Semaphore(self.max_concurrent)
+            except RuntimeError:
+                # No event loop running yet
+                pass
+
+    @property
+    def semaphore(self) -> asyncio.Semaphore:
+        """Get semaphore, creating it if necessary."""
+        self._ensure_semaphore()
+        if self._semaphore is None:
+            # Create in current event loop
+            self._semaphore = asyncio.Semaphore(self.max_concurrent)
+        return self._semaphore
 
     async def process_files(
         self,

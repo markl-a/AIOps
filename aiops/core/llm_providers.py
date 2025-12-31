@@ -522,9 +522,18 @@ class LLMProviderManager:
     async def auto_health_check(self):
         """Automatically run health checks at intervals."""
         while True:
-            await asyncio.sleep(self.health_check_interval)
-
             try:
-                await self.health_check_all()
+                await asyncio.sleep(self.health_check_interval)
+
+                # Run health check with timeout to prevent hanging
+                await asyncio.wait_for(
+                    self.health_check_all(),
+                    timeout=60.0  # 1 minute timeout for all health checks
+                )
+            except asyncio.TimeoutError:
+                logger.error("Auto health check timed out after 60 seconds")
+            except asyncio.CancelledError:
+                logger.info("Auto health check cancelled, stopping")
+                break
             except Exception as e:
                 logger.error(f"Auto health check failed: {e}")

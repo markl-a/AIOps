@@ -1,5 +1,6 @@
 """Project scanner for comprehensive analysis."""
 
+import asyncio
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import json
@@ -20,8 +21,8 @@ class ProjectScanner:
         """
         self.project_path = Path(project_path)
 
-    def get_project_structure(self) -> Dict[str, Any]:
-        """Get project structure analysis."""
+    async def get_project_structure(self) -> Dict[str, Any]:
+        """Get project structure analysis asynchronously."""
         logger.info(f"Scanning project structure: {self.project_path}")
 
         structure = {
@@ -56,10 +57,11 @@ class ProjectScanner:
                 structure["files_by_type"][ext]["count"] += 1
                 structure["files_by_type"][ext]["files"].append(str(path.relative_to(self.project_path)))
 
-                # Count lines for text files
+                # Count lines for text files asynchronously
                 try:
-                    with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                        lines = len(f.readlines())
+                    # Use asyncio.to_thread to avoid blocking the event loop
+                    lines = await asyncio.to_thread(self._count_lines, path)
+                    if lines > 0:
                         structure["files_by_type"][ext]["total_lines"] += lines
                         structure["total_lines"] += lines
                 except Exception:
@@ -71,6 +73,14 @@ class ProjectScanner:
                 structure["directories"].append(str(path.relative_to(self.project_path)))
 
         return structure
+
+    def _count_lines(self, path: Path) -> int:
+        """Count lines in a file (sync helper method)."""
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                return len(f.readlines())
+        except Exception:
+            return 0
 
     def identify_project_type(self) -> Dict[str, Any]:
         """Identify project type and framework."""
@@ -184,14 +194,17 @@ class ProjectScanner:
 
         return sensitive_files
 
-    def generate_project_report(self) -> str:
-        """Generate comprehensive project report."""
+    async def generate_project_report(self) -> str:
+        """Generate comprehensive project report asynchronously."""
         logger.info("Generating project report...")
 
-        structure = self.get_project_structure()
-        project_type = self.identify_project_type()
-        test_coverage = self.calculate_test_coverage_potential()
-        sensitive_files = self.find_security_sensitive_files()
+        # Run analysis operations in parallel for better performance
+        structure, project_type, test_coverage, sensitive_files = await asyncio.gather(
+            self.get_project_structure(),
+            asyncio.to_thread(self.identify_project_type),
+            asyncio.to_thread(self.calculate_test_coverage_potential),
+            asyncio.to_thread(self.find_security_sensitive_files),
+        )
 
         report = f"""# Project Analysis Report
 
@@ -235,16 +248,29 @@ class ProjectScanner:
 
         return report
 
-    def export_analysis(self, output_file: Path):
-        """Export analysis to JSON file."""
+    async def export_analysis(self, output_file: Path):
+        """Export analysis to JSON file asynchronously."""
+        # Run analysis operations in parallel for better performance
+        structure, project_type, test_coverage, sensitive_files = await asyncio.gather(
+            self.get_project_structure(),
+            asyncio.to_thread(self.identify_project_type),
+            asyncio.to_thread(self.calculate_test_coverage_potential),
+            asyncio.to_thread(self.find_security_sensitive_files),
+        )
+
         analysis = {
-            "structure": self.get_project_structure(),
-            "project_type": self.identify_project_type(),
-            "test_coverage": self.calculate_test_coverage_potential(),
-            "sensitive_files": [str(f) for f in self.find_security_sensitive_files()],
+            "structure": structure,
+            "project_type": project_type,
+            "test_coverage": test_coverage,
+            "sensitive_files": [str(f) for f in sensitive_files],
         }
 
-        with open(output_file, "w") as f:
-            json.dump(analysis, f, indent=2)
+        # Use asyncio.to_thread for file I/O to avoid blocking
+        await asyncio.to_thread(self._write_json, output_file, analysis)
 
         logger.info(f"Analysis exported to {output_file}")
+
+    def _write_json(self, output_file: Path, data: dict):
+        """Write JSON to file (sync helper method)."""
+        with open(output_file, "w") as f:
+            json.dump(data, f, indent=2)

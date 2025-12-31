@@ -1,15 +1,31 @@
 """Analytics and Metrics Routes"""
 
-from fastapi import APIRouter, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Query, HTTPException, status
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
+import re
 
 from aiops.core.structured_logger import get_structured_logger
 
 
 logger = get_structured_logger(__name__)
 router = APIRouter()
+
+# Security: Allowed metric names (whitelist approach)
+ALLOWED_METRIC_PATTERNS = [
+    r'^[a-zA-Z0-9._-]+$',  # Alphanumeric with dots, underscores, and hyphens
+]
+
+def validate_metric_name(metric_name: str) -> bool:
+    """Validate metric name against allowed patterns."""
+    if not metric_name or len(metric_name) > 100:
+        return False
+
+    for pattern in ALLOWED_METRIC_PATTERNS:
+        if re.match(pattern, metric_name):
+            return True
+    return False
 
 
 # Response Models
@@ -98,16 +114,47 @@ async def get_agent_metrics():
 
 @router.get("/metrics/timeseries", response_model=List[MetricResponse])
 async def get_timeseries_metrics(
-    metric_names: List[str] = Query(..., description="Metric names to fetch"),
+    metric_names: List[str] = Query(..., description="Metric names to fetch", max_length=50),
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
-    aggregation: str = "avg",
+    aggregation: str = Query("avg", regex="^(avg|sum|min|max|count)$"),
 ):
     """Get time series metrics."""
+    # Validate number of metrics requested (prevent DoS)
+    if len(metric_names) > 20:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot request more than 20 metrics at once"
+        )
+
+    # Validate each metric name
+    for metric_name in metric_names:
+        if not validate_metric_name(metric_name):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid metric name: {metric_name}"
+            )
+
+    # Validate time range
     if not start_time:
         start_time = datetime.now() - timedelta(hours=24)
     if not end_time:
         end_time = datetime.now()
+
+    # Prevent querying too far in the past (max 90 days)
+    max_range = timedelta(days=90)
+    if (end_time - start_time) > max_range:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Time range cannot exceed 90 days"
+        )
+
+    # Ensure start_time is before end_time
+    if start_time >= end_time:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_time must be before end_time"
+        )
 
     # Mock implementation
     responses = []
@@ -163,8 +210,15 @@ async def get_cost_breakdown():
 
 
 @router.get("/analytics/usage-trends")
-async def get_usage_trends(days: int = 30):
+async def get_usage_trends(days: int = Query(30, ge=1, le=90)):
     """Get usage trends over time."""
+    # Validate days parameter
+    if days < 1 or days > 90:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Days must be between 1 and 90"
+        )
+
     # Mock implementation
     daily_data = []
     for i in range(days):
@@ -189,8 +243,15 @@ async def get_usage_trends(days: int = 30):
 
 
 @router.get("/analytics/top-errors")
-async def get_top_errors(limit: int = 10):
+async def get_top_errors(limit: int = Query(10, ge=1, le=100)):
     """Get most common errors."""
+    # Validate limit parameter
+    if limit < 1 or limit > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Limit must be between 1 and 100"
+        )
+
     # Mock implementation
     errors = [
         {
