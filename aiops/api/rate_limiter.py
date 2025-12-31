@@ -139,6 +139,9 @@ class SlidingWindowCounter:
             is_allowed = weighted_total < self.limit
 
             if is_allowed:
+                # Increment counter for current window (defaultdict handles missing keys)
+                if current_window not in self._counters[identifier]:
+                    self._counters[identifier][current_window] = 0
                 self._counters[identifier][current_window] += 1
 
             # Calculate reset time
@@ -217,6 +220,96 @@ class TokenBucket:
             }
 
 
+class RedisRateLimiter:
+    """Redis-based sliding window rate limiter with in-memory fallback."""
+
+    def __init__(self, limit: int, window: int, redis_client=None, key_prefix: str = "rl"):
+        """
+        Initialize Redis rate limiter.
+
+        Args:
+            limit: Maximum requests allowed
+            window: Time window in seconds
+            redis_client: Redis client (optional)
+            key_prefix: Prefix for Redis keys
+        """
+        self.limit = limit
+        self.window = window
+        self._redis = redis_client
+        self.key_prefix = key_prefix
+
+        # Fallback to in-memory when Redis unavailable
+        self._fallback = SlidingWindowCounter(limit=limit, window=window)
+        self._redis_available = redis_client is not None
+
+    def _get_redis_key(self, identifier: str) -> str:
+        """Get Redis key for identifier."""
+        return f"{self.key_prefix}:{identifier}"
+
+    def is_allowed(self, identifier: str) -> tuple[bool, Dict[str, Any]]:
+        """
+        Check if request is allowed using Redis or fallback.
+
+        Returns:
+            Tuple of (is_allowed, rate_limit_info)
+        """
+        # Try Redis first if available
+        if self._redis_available and self._redis:
+            try:
+                return self._check_redis(identifier)
+            except Exception as e:
+                logger.warning(f"Redis rate limit check failed, using fallback: {e}")
+                self._redis_available = False
+
+        # Fall back to in-memory
+        return self._fallback.is_allowed(identifier)
+
+    def _check_redis(self, identifier: str) -> tuple[bool, Dict[str, Any]]:
+        """Check rate limit using Redis sorted set (sliding window)."""
+        now = time.time()
+        key = self._get_redis_key(identifier)
+        window_start = now - self.window
+
+        # Use Redis pipeline for atomic operations
+        pipe = self._redis.pipeline()
+
+        # Remove old entries outside the window
+        pipe.zremrangebyscore(key, 0, window_start)
+
+        # Count current requests in window
+        pipe.zcard(key)
+
+        # Execute pipeline
+        results = pipe.execute()
+        current_count = results[1]
+
+        # Check if allowed
+        is_allowed = current_count < self.limit
+
+        if is_allowed:
+            # Add current request with timestamp as score
+            self._redis.zadd(key, {f"{now}:{id(identifier)}": now})
+            # Set expiration to window + buffer
+            self._redis.expire(key, self.window + 10)
+
+        # Calculate reset time (when oldest request expires)
+        try:
+            oldest = self._redis.zrange(key, 0, 0, withscores=True)
+            if oldest:
+                reset_time = int(oldest[0][1] + self.window)
+            else:
+                reset_time = int(now + self.window)
+        except Exception:
+            reset_time = int(now + self.window)
+
+        return is_allowed, {
+            "limit": self.limit,
+            "remaining": max(0, self.limit - current_count - (1 if is_allowed else 0)),
+            "reset": reset_time,
+            "window": self.window,
+        }
+
+
 class RateLimiter:
     """
     Advanced rate limiter with multiple algorithms and strategies.
@@ -226,51 +319,88 @@ class RateLimiter:
     - Per-user rate limits with tiers
     - Multiple algorithms (sliding window, token bucket)
     - Redis backend for distributed rate limiting
+    - Automatic fallback to in-memory when Redis unavailable
     """
 
     def __init__(self, config: Optional[RateLimitConfig] = None):
         """Initialize rate limiter."""
         self.config = config or RateLimitConfig()
 
-        # Initialize endpoint limiters
-        self._endpoint_limiters: Dict[str, SlidingWindowCounter] = {}
-        for path, rule in {**DEFAULT_ENDPOINT_LIMITS, **self.config.endpoint_limits}.items():
-            self._endpoint_limiters[path] = SlidingWindowCounter(
-                limit=rule.requests,
-                window=rule.window,
-            )
-
-        # Initialize tier limiters
-        self._tier_limiters: Dict[str, SlidingWindowCounter] = {}
-        for tier, rule in {**DEFAULT_USER_TIER_LIMITS, **self.config.user_tier_limits}.items():
-            self._tier_limiters[tier] = SlidingWindowCounter(
-                limit=rule.requests,
-                window=rule.window,
-            )
-
-        # Default limiter
-        self._default_limiter = SlidingWindowCounter(
-            limit=self.config.default_limit,
-            window=self.config.default_window,
-        )
-
         # Redis client (if enabled)
         self._redis = None
+        self._redis_available = False
         if self.config.use_redis:
             self._init_redis()
 
-        logger.info("Rate limiter initialized")
+        # Initialize endpoint limiters
+        self._endpoint_limiters: Dict[str, Any] = {}
+        for path, rule in {**DEFAULT_ENDPOINT_LIMITS, **self.config.endpoint_limits}.items():
+            if self._redis_available:
+                self._endpoint_limiters[path] = RedisRateLimiter(
+                    limit=rule.requests,
+                    window=rule.window,
+                    redis_client=self._redis,
+                    key_prefix=f"rl:endpoint:{path}",
+                )
+            else:
+                self._endpoint_limiters[path] = SlidingWindowCounter(
+                    limit=rule.requests,
+                    window=rule.window,
+                )
+
+        # Initialize tier limiters
+        self._tier_limiters: Dict[str, Any] = {}
+        for tier, rule in {**DEFAULT_USER_TIER_LIMITS, **self.config.user_tier_limits}.items():
+            if self._redis_available:
+                self._tier_limiters[tier] = RedisRateLimiter(
+                    limit=rule.requests,
+                    window=rule.window,
+                    redis_client=self._redis,
+                    key_prefix=f"rl:tier:{tier}",
+                )
+            else:
+                self._tier_limiters[tier] = SlidingWindowCounter(
+                    limit=rule.requests,
+                    window=rule.window,
+                )
+
+        # Default limiter
+        if self._redis_available:
+            self._default_limiter = RedisRateLimiter(
+                limit=self.config.default_limit,
+                window=self.config.default_window,
+                redis_client=self._redis,
+                key_prefix="rl:default",
+            )
+        else:
+            self._default_limiter = SlidingWindowCounter(
+                limit=self.config.default_limit,
+                window=self.config.default_window,
+            )
+
+        logger.info(
+            "Rate limiter initialized",
+            redis_enabled=self._redis_available,
+            backend="redis" if self._redis_available else "in-memory",
+        )
 
     def _init_redis(self):
         """Initialize Redis connection."""
         try:
             import redis
-            self._redis = redis.from_url(self.config.redis_url)
+            self._redis = redis.from_url(
+                self.config.redis_url,
+                socket_timeout=2,
+                socket_connect_timeout=2,
+                decode_responses=True,
+            )
             self._redis.ping()
-            logger.info("Redis rate limiter backend connected")
+            self._redis_available = True
+            logger.info("Redis rate limiter backend connected", url=self.config.redis_url)
         except Exception as e:
-            logger.warning(f"Redis connection failed, using in-memory: {e}")
+            logger.warning(f"Redis connection failed, using in-memory fallback: {e}")
             self._redis = None
+            self._redis_available = False
 
     def _get_identifier(self, request: Request) -> str:
         """Extract identifier from request."""

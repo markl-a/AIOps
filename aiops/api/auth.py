@@ -9,7 +9,8 @@ from passlib.context import CryptContext
 
 from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 from pydantic import BaseModel
 import json
 import os
@@ -158,7 +159,7 @@ class APIKeyManager:
         keys[key_id] = key_data.model_dump()
         self._save_keys(keys)
 
-        logger.info(f"Created API key: {name} (role: {role})")
+        logger.info(f"Security event: Created API key '{name}' (role={role}, rate_limit={rate_limit}/min)")
         return api_key
 
     def validate_api_key(self, api_key: str) -> Optional[APIKey]:
@@ -179,7 +180,7 @@ class APIKeyManager:
         key_data = keys.get(key_id)
 
         if not key_data:
-            logger.warning("API key not found")
+            logger.warning(f"Authentication failed: API key not found (key_id={key_id[:16]}...)")
             return None
 
         api_key_obj = APIKey(**key_data)
@@ -187,20 +188,23 @@ class APIKeyManager:
         # Verify the API key using bcrypt (constant-time comparison)
         try:
             if not pwd_context.verify(api_key, api_key_obj.key_hash):
-                logger.warning("Invalid API key provided")
+                logger.warning(f"Authentication failed: Invalid API key for '{api_key_obj.name}'")
                 return None
         except Exception as e:
             logger.error(f"Error validating API key: {e}")
             return None
 
         if not api_key_obj.enabled:
-            logger.warning(f"Attempted use of disabled API key: {api_key_obj.name}")
+            logger.warning(f"Authentication failed: Attempted use of disabled API key '{api_key_obj.name}'")
             return None
 
         # Update last used timestamp
         api_key_obj.last_used = datetime.utcnow()
         keys[key_id] = api_key_obj.model_dump()
         self._save_keys(keys)
+
+        # Log successful authentication
+        logger.info(f"Authentication successful: API key '{api_key_obj.name}' (role={api_key_obj.role})")
 
         return api_key_obj
 
@@ -216,10 +220,12 @@ class APIKeyManager:
         """
         keys = self._load_keys()
         if key_hash in keys:
+            key_name = keys[key_hash]['name']
             keys[key_hash]["enabled"] = False
             self._save_keys(keys)
-            logger.info(f"Revoked API key: {keys[key_hash]['name']}")
+            logger.warning(f"Security event: Revoked API key '{key_name}'")
             return True
+        logger.error(f"Security event: Attempted to revoke non-existent API key (key_hash={key_hash[:16]}...)")
         return False
 
     def list_api_keys(self) -> list[APIKey]:
@@ -276,15 +282,20 @@ def decode_access_token(token: str) -> TokenData:
         exp: float = payload.get("exp")
 
         if username is None:
+            logger.warning("Authentication failed: JWT token missing 'sub' claim")
             raise HTTPException(status_code=401, detail="Invalid authentication token")
 
-        return TokenData(
+        token_data = TokenData(
             username=username,
             role=UserRole(role),
             exp=datetime.fromtimestamp(exp)
         )
-    except JWTError as e:
-        logger.warning(f"JWT validation failed: {e}")
+
+        logger.info(f"Authentication successful: JWT token for user '{username}' (role={role})")
+        return token_data
+
+    except PyJWTError as e:
+        logger.warning(f"Authentication failed: JWT validation error - {e}")
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
 

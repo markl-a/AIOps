@@ -172,15 +172,6 @@ class RedisBackend(CacheBackend):
             self.enabled = False
             self.client = None
 
-    def __del__(self):
-        """Cleanup Redis connection pool on deletion."""
-        try:
-            if hasattr(self, 'pool') and self.pool is not None:
-                self.pool.disconnect()
-                logger.debug("Redis connection pool disconnected")
-        except Exception as e:
-            logger.debug(f"Error during Redis cleanup: {e}")
-
     def _connect_with_retry(self) -> bool:
         """Connect to Redis with exponential backoff retry.
 
@@ -456,8 +447,8 @@ class Cache:
 
     def __init__(
         self,
-        cache_dir: Optional[str] = None,
-        ttl: Optional[int] = None,
+        cache_dir: str = ".aiops_cache",
+        ttl: int = 3600,
         enable_redis: Optional[bool] = None,
         enable_stampede_protection: bool = True,
     ):
@@ -465,16 +456,12 @@ class Cache:
         Initialize cache.
 
         Args:
-            cache_dir: Directory to store cache files (uses config if None)
-            ttl: Time-to-live in seconds (uses config if None)
-            enable_redis: Enable Redis backend (uses config if None)
+            cache_dir: Directory to store cache files
+            ttl: Time-to-live in seconds (default: 1 hour)
+            enable_redis: Enable Redis backend (auto-detect if None)
             enable_stampede_protection: Enable cache stampede protection
         """
-        # Import here to avoid circular dependency
-        from aiops.core.config import get_config
-        config = get_config()
-
-        self.ttl = ttl or config.cache_default_ttl
+        self.ttl = ttl
         self.hits = 0
         self.misses = 0
         self.enable_stampede_protection = enable_stampede_protection
@@ -482,24 +469,12 @@ class Cache:
 
         # Determine if Redis should be used
         if enable_redis is None:
-            enable_redis = config.enable_redis
-
-        # Get cache directory from config
-        if cache_dir is None:
-            cache_dir = config.cache_dir
+            enable_redis = os.getenv("ENABLE_REDIS", "false").lower() == "true"
 
         # Initialize backend
         if enable_redis:
-            redis_url = config.redis_url
-            redis_max_connections = config.redis_max_connections
-            redis_socket_timeout = config.redis_socket_timeout
-
-            self.backend = RedisBackend(
-                redis_url=redis_url,
-                max_connections=redis_max_connections,
-                socket_timeout=redis_socket_timeout,
-                socket_connect_timeout=redis_socket_timeout,
-            )
+            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+            self.backend = RedisBackend(redis_url)
             if not self.backend.enabled:
                 logger.warning("Redis unavailable, falling back to file cache")
                 self.backend = FileBackend(Path(cache_dir))
@@ -508,31 +483,8 @@ class Cache:
 
         logger.info(
             f"Cache initialized with {self.backend.__class__.__name__} "
-            f"(ttl={self.ttl}s, stampede_protection={enable_stampede_protection})"
+            f"(stampede_protection={enable_stampede_protection})"
         )
-
-    def __enter__(self):
-        """Context manager entry."""
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit - cleanup resources."""
-        # Clear cache on exit to free memory
-        # This is optional - only clear if backend is file-based to avoid losing data
-        if isinstance(self.backend, FileBackend):
-            logger.debug("Cleaning up file cache on context exit")
-        return False
-
-    async def __aenter__(self):
-        """Async context manager entry."""
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit - cleanup resources."""
-        # Same cleanup as sync version
-        if isinstance(self.backend, FileBackend):
-            logger.debug("Cleaning up file cache on async context exit")
-        return False
 
     def _get_cache_key(self, func_module: str, func_name: str, *args, **kwargs) -> str:
         """Generate cache key from function identity and arguments.
@@ -793,11 +745,6 @@ class RateLimiter:
             # Remove old calls outside time window
             self.calls = [call_time for call_time in self.calls if now - call_time < self.time_window]
 
-            # Additional safety: ensure list doesn't grow beyond max_calls * 2
-            # This prevents memory leaks if cleanup fails
-            if len(self.calls) > self.max_calls * 2:
-                self.calls = self.calls[-(self.max_calls * 2):]
-
             # Check if under limit
             if len(self.calls) < self.max_calls:
                 self.calls.append(now)
@@ -808,13 +755,6 @@ class RateLimiter:
     def wait_time(self) -> float:
         """Get wait time until next call is allowed."""
         with self._lock:
-            if len(self.calls) < self.max_calls:
-                return 0.0
-
-            # Clean up expired calls first
-            now = time.time()
-            self.calls = [call_time for call_time in self.calls if now - call_time < self.time_window]
-
             if len(self.calls) < self.max_calls:
                 return 0.0
 
@@ -833,11 +773,6 @@ class RateLimiter:
                 "time_window": self.time_window,
                 "utilization": f"{active_calls / self.max_calls * 100:.1f}%",
             }
-
-    def clear(self):
-        """Clear all rate limit history to free memory."""
-        with self._lock:
-            self.calls.clear()
 
 
 def rate_limited(max_calls: int = 60, time_window: int = 60):

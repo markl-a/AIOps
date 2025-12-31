@@ -58,33 +58,55 @@ class AgentExecutionRequest(BaseModel):
         ...,
         description="Type of agent to execute",
         min_length=1,
-        max_length=100
+        max_length=100,
+        examples=["code_reviewer", "security_scanner", "k8s_optimizer"]
     )
     input_data: Dict[str, Any] = Field(
         ...,
-        description="Input data for the agent"
+        description="Input data for the agent",
+        examples=[{"file_path": "/src/main.py", "check_security": True}]
     )
     async_execution: bool = Field(
         default=False,
-        description="Execute asynchronously"
+        description="Execute asynchronously in background. Returns immediately with execution_id",
+        examples=[False]
     )
     timeout_seconds: Optional[float] = Field(
         default=None,
         description="Maximum execution time in seconds (default: 300)",
         ge=1.0,
-        le=3600.0  # Max 1 hour
+        le=3600.0,  # Max 1 hour
+        examples=[300.0]
     )
     max_retries: Optional[int] = Field(
         default=None,
         description="Maximum number of retry attempts on failure (default: 0)",
         ge=0,
-        le=5  # Max 5 retries
+        le=5,  # Max 5 retries
+        examples=[3]
     )
     callback_url: Optional[str] = Field(
         None,
-        description="URL to call when complete",
-        max_length=500
+        description="URL to call when execution completes (for async execution)",
+        max_length=500,
+        examples=["https://example.com/webhooks/agent-complete"]
     )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "agent_type": "code_reviewer",
+                "input_data": {
+                    "repository": "example/repo",
+                    "file_path": "src/main.py",
+                    "check_security": True
+                },
+                "async_execution": False,
+                "timeout_seconds": 300.0,
+                "max_retries": 3,
+                "callback_url": "https://example.com/webhooks/callback"
+            }
+        }
 
     @field_validator('agent_type')
     @classmethod
@@ -160,28 +182,95 @@ class AgentExecutionRequest(BaseModel):
 class AgentExecutionResponse(BaseModel):
     """Response from agent execution."""
 
-    execution_id: str
-    agent_type: str
-    status: str
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    started_at: datetime
-    completed_at: Optional[datetime] = None
-    duration_seconds: Optional[float] = None
+    execution_id: str = Field(..., description="Unique execution identifier")
+    agent_type: str = Field(..., description="Type of agent that was executed")
+    status: str = Field(..., description="Execution status: running, completed, failed, timeout, cancelled")
+    result: Optional[Dict[str, Any]] = Field(None, description="Execution result data if completed successfully")
+    error: Optional[str] = Field(None, description="Error message if execution failed")
+    started_at: datetime = Field(..., description="Timestamp when execution started")
+    completed_at: Optional[datetime] = Field(None, description="Timestamp when execution completed")
+    duration_seconds: Optional[float] = Field(None, description="Total execution duration in seconds")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "execution_id": "550e8400-e29b-41d4-a716-446655440000",
+                "agent_type": "code_reviewer",
+                "status": "completed",
+                "result": {
+                    "status": "success",
+                    "message": "Agent code_reviewer executed successfully",
+                    "data": {
+                        "issues_found": 3,
+                        "suggestions": ["Use type hints", "Add docstrings"]
+                    }
+                },
+                "error": None,
+                "started_at": "2024-01-15T10:30:00Z",
+                "completed_at": "2024-01-15T10:30:05Z",
+                "duration_seconds": 5.2
+            }
+        }
 
 
 class AgentListResponse(BaseModel):
     """List of available agents."""
 
-    agents: List[Dict[str, Any]]
-    total: int
+    agents: List[Dict[str, Any]] = Field(..., description="List of available agents with their metadata")
+    total: int = Field(..., description="Total number of available agents")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "agents": [
+                    {
+                        "name": "code_reviewer",
+                        "description": "Analyzes code for quality issues and best practices",
+                        "category": "code_quality",
+                        "tags": ["python", "review", "quality"]
+                    },
+                    {
+                        "name": "security_scanner",
+                        "description": "Scans code for security vulnerabilities",
+                        "category": "security",
+                        "tags": ["security", "scanning"]
+                    }
+                ],
+                "total": 2
+            }
+        }
 
 
 # In-memory execution tracking (use database in production)
 executions: Dict[str, Dict[str, Any]] = {}
 
 
-@router.get("/", response_model=AgentListResponse)
+@router.get(
+    "/",
+    response_model=AgentListResponse,
+    summary="List available agents",
+    description="Retrieve a list of all registered agents with their metadata including name, description, category, and tags.",
+    responses={
+        200: {
+            "description": "Successfully retrieved list of agents",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "agents": [
+                            {
+                                "name": "code_reviewer",
+                                "description": "Analyzes code for quality issues",
+                                "category": "code_quality",
+                                "tags": ["python", "review"]
+                            }
+                        ],
+                        "total": 1
+                    }
+                }
+            }
+        }
+    }
+)
 async def list_agents():
     """List all available agents from the registry."""
     registered_agents = agent_registry.list_agents()
@@ -199,7 +288,70 @@ async def list_agents():
     return AgentListResponse(agents=agents, total=len(agents))
 
 
-@router.post("/execute", response_model=AgentExecutionResponse)
+@router.post(
+    "/execute",
+    response_model=AgentExecutionResponse,
+    summary="Execute an agent",
+    description="""Execute a specific agent with the provided input data.
+
+    Supports both synchronous and asynchronous execution modes:
+    - **Synchronous**: Waits for execution to complete and returns the result
+    - **Asynchronous**: Returns immediately with execution_id for later polling
+
+    Features:
+    - Configurable timeouts (1s - 1 hour)
+    - Automatic retry with exponential backoff
+    - Optional callback URL for async execution
+    - Input validation and sanitization
+    """,
+    responses={
+        200: {
+            "description": "Agent execution completed successfully (synchronous) or started (asynchronous)",
+        },
+        400: {
+            "description": "Invalid request parameters",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "ValidationError",
+                        "message": "Request validation failed",
+                        "details": [{"field": "agent_type", "message": "Unknown agent type"}]
+                    }
+                }
+            }
+        },
+        408: {
+            "description": "Agent execution timed out",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Agent execution timed out after 300.0s"
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Agent result validation failed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Agent result validation failed: Invalid output schema"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Agent execution failed or internal server error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Agent execution failed: Internal agent error"
+                    }
+                }
+            }
+        }
+    }
+)
 async def execute_agent(
     request: AgentExecutionRequest,
     background_tasks: BackgroundTasks,
@@ -372,7 +524,23 @@ async def execute_agent(
             )
 
 
-@router.get("/executions/{execution_id}", response_model=AgentExecutionResponse)
+@router.get(
+    "/executions/{execution_id}",
+    response_model=AgentExecutionResponse,
+    summary="Get execution status",
+    description="Retrieve the status and result of a specific agent execution by its ID.",
+    responses={
+        200: {"description": "Execution found and returned successfully"},
+        404: {
+            "description": "Execution not found",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Execution 550e8400-e29b-41d4-a716-446655440000 not found"}
+                }
+            }
+        }
+    }
+)
 async def get_execution(execution_id: str):
     """Get execution status and result."""
     if execution_id not in executions:

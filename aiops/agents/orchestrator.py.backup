@@ -1,7 +1,6 @@
 """Agent Orchestrator for managing complex workflows and multi-agent coordination."""
 
 import asyncio
-import threading
 from typing import Any, Dict, List, Optional, Callable, Union, Tuple
 from enum import Enum
 from dataclasses import dataclass, field
@@ -103,13 +102,11 @@ class AgentOrchestrator:
         self.workflows: OrderedDict[str, WorkflowResult] = OrderedDict()
         self._task_counter = 0
         self._max_workflow_history = max_workflow_history
-        self._lock = threading.Lock()
 
     def _generate_task_id(self, agent_name: str) -> str:
         """Generate unique task ID."""
-        with self._lock:
-            self._task_counter += 1
-            return f"{agent_name}_{self._task_counter}_{datetime.now().timestamp()}"
+        self._task_counter += 1
+        return f"{agent_name}_{self._task_counter}_{datetime.now().timestamp()}"
 
     def _store_workflow_result(self, workflow_id: str, result: WorkflowResult) -> None:
         """Store workflow result with LRU eviction.
@@ -118,16 +115,15 @@ class AgentOrchestrator:
             workflow_id: Unique workflow identifier
             result: Workflow execution result
         """
-        with self._lock:
-            # Evict oldest workflow if at capacity
-            if len(self.workflows) >= self._max_workflow_history and workflow_id not in self.workflows:
-                oldest_id = next(iter(self.workflows))
-                del self.workflows[oldest_id]
-                logger.debug(f"Evicted old workflow from history: {oldest_id}")
+        # Evict oldest workflow if at capacity
+        if len(self.workflows) >= self._max_workflow_history and workflow_id not in self.workflows:
+            oldest_id = next(iter(self.workflows))
+            del self.workflows[oldest_id]
+            logger.debug(f"Evicted old workflow from history: {oldest_id}")
 
-            self.workflows[workflow_id] = result
-            # Move to end for LRU
-            self.workflows.move_to_end(workflow_id)
+        self.workflows[workflow_id] = result
+        # Move to end for LRU
+        self.workflows.move_to_end(workflow_id)
 
     async def execute_sequential(
         self,
@@ -557,19 +553,16 @@ class AgentOrchestrator:
 
     def get_workflow(self, workflow_id: str) -> Optional[WorkflowResult]:
         """Get workflow result by ID."""
-        with self._lock:
-            return self.workflows.get(workflow_id)
+        return self.workflows.get(workflow_id)
 
     def list_workflows(self) -> List[WorkflowResult]:
         """List all workflow results."""
-        with self._lock:
-            return list(self.workflows.values())
+        return list(self.workflows.values())
 
     def clear_workflows(self) -> None:
         """Clear all workflow history."""
-        with self._lock:
-            self.workflows.clear()
-            logger.info("Cleared all workflow history")
+        self.workflows.clear()
+        logger.info("Cleared all workflow history")
 
 
 # Global orchestrator instance

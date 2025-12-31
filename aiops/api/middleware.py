@@ -81,7 +81,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         # Add rate limit headers
-        limit_info = self._get_limit_info(identifier)
+        limit_info = self._get_limit_info(identifier, request)
         response.headers["X-RateLimit-Limit"] = str(limit_info["limit"])
         response.headers["X-RateLimit-Remaining"] = str(limit_info["remaining"])
         response.headers["X-RateLimit-Reset"] = str(limit_info["reset"])
@@ -134,10 +134,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         now = time.time()
         self.requests[identifier].append((now, 1))
 
-    def _get_limit_info(self, identifier: str) -> dict:
+    def _get_limit_info(self, identifier: str, request: Request = None) -> dict:
         """Get current limit information."""
         now = time.time()
         cutoff = now - self.window_seconds
+
+        # Get actual limit (may be custom per user)
+        limit = self.default_limit
+        if request and hasattr(request.state, "user"):
+            user = request.state.user
+            if isinstance(user, dict) and "rate_limit" in user:
+                limit = user["rate_limit"]
 
         # Clean old requests
         self.requests[identifier] = [
@@ -151,8 +158,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         reset_time = int(oldest_ts + self.window_seconds)
 
         return {
-            "limit": self.default_limit,
-            "remaining": max(0, self.default_limit - total),
+            "limit": limit,
+            "remaining": max(0, limit - total),
             "reset": reset_time,
         }
 

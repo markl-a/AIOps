@@ -17,6 +17,58 @@ from aiops.core.exceptions import (
 )
 
 
+def _mask_sensitive_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Mask sensitive data in dictionaries before logging.
+
+    Args:
+        data: Dictionary that may contain sensitive data
+
+    Returns:
+        Dictionary with sensitive fields masked
+    """
+    import re
+
+    # Fields that should always be masked
+    sensitive_fields = {
+        'password', 'secret', 'token', 'api_key', 'apikey', 'auth',
+        'authorization', 'credential', 'private_key', 'access_token',
+        'refresh_token', 'session_id', 'ssn', 'credit_card', 'api-key',
+        'bearer', 'jwt', 'client_secret', 'client_id', 'webhook_secret',
+    }
+
+    masked_data = {}
+    for key, value in data.items():
+        key_lower = key.lower().replace('-', '_')
+
+        # Check if field name indicates sensitive data
+        if any(sensitive in key_lower for sensitive in sensitive_fields):
+            masked_data[key] = "***REDACTED***"
+        elif isinstance(value, dict):
+            # Recursively mask nested dictionaries
+            masked_data[key] = _mask_sensitive_data(value)
+        elif isinstance(value, str):
+            # Check if value looks like a secret (long alphanumeric string, JWT, etc.)
+            # Mask JWT tokens
+            if re.match(r'^eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+$', value):
+                masked_data[key] = "***JWT_TOKEN***"
+            # Mask long API key-like strings
+            elif len(value) > 20 and re.match(r'^[a-zA-Z0-9_\-]{20,}$', value):
+                masked_data[key] = f"{value[:4]}***{value[-4:]}" if len(value) > 8 else "***MASKED***"
+            else:
+                masked_data[key] = value
+        elif isinstance(value, list):
+            # Mask items in lists
+            masked_data[key] = [
+                _mask_sensitive_data(item) if isinstance(item, dict) else item
+                for item in value
+            ]
+        else:
+            masked_data[key] = value
+
+    return masked_data
+
+
 class ErrorHandler:
     """Centralized error handling for AIOps."""
 
@@ -67,39 +119,49 @@ class ErrorHandler:
             "traceback": traceback.format_exc(),
         }
 
+        # Mask sensitive data in context before logging
         if context:
-            log_data["context"] = context
+            log_data["context"] = _mask_sensitive_data(context)
 
         if hasattr(aiops_error, "details"):
-            log_data["details"] = aiops_error.details
+            # Mask sensitive data in error details as well
+            if isinstance(aiops_error.details, dict):
+                log_data["details"] = _mask_sensitive_data(aiops_error.details)
+            else:
+                log_data["details"] = aiops_error.details
 
         # Log based on severity
         log_func = getattr(logger, severity, logger.error)
         log_func(f"Error occurred: {log_data}")
 
-        # Send to Sentry if enabled
+        # Send to Sentry if enabled (with original unmasked context for debugging)
         if self.enable_sentry:
             self._send_to_sentry(error, context)
 
     def _send_to_sentry(self, error: Exception, context: Optional[Dict[str, Any]] = None):
-        """Send error to Sentry.
+        """Send error to Sentry with masked sensitive data.
 
         Args:
             error: The exception
-            context: Additional context
+            context: Additional context (will be masked before sending)
         """
         try:
             import sentry_sdk
 
             with sentry_sdk.push_scope() as scope:
+                # Mask sensitive data before sending to Sentry
                 if context:
-                    for key, value in context.items():
+                    masked_context = _mask_sensitive_data(context)
+                    for key, value in masked_context.items():
                         scope.set_extra(key, value)
 
                 if isinstance(error, AIOpsException):
                     scope.set_tag("error_code", error.error_code)
-                    for key, value in error.details.items():
-                        scope.set_extra(key, value)
+                    # Mask sensitive data in error details
+                    if isinstance(error.details, dict):
+                        masked_details = _mask_sensitive_data(error.details)
+                        for key, value in masked_details.items():
+                            scope.set_extra(key, value)
 
                 sentry_sdk.capture_exception(error)
         except Exception as e:

@@ -1,0 +1,143 @@
+================================================================================
+CODE DUPLICATION ANALYSIS - EXECUTIVE SUMMARY
+AIOps Project - 2025-12-31
+================================================================================
+
+SCOPE
+-----
+- Analyzed: 30+ agent files in aiops/agents/*.py
+- Analyzed: 8 API route files in aiops/api/routes/*.py
+- Total files examined: 40+
+
+KEY FINDINGS
+------------
+1. Error Handling Duplication
+   - 13 agents with identical try-except patterns
+   - ~10-15 lines duplicated per occurrence
+   - Estimated: 130-195 lines of duplicate code
+
+2. Prompt Creation Duplication
+   - 12 agents with duplicate _create_system_prompt() methods
+   - 12 agents with duplicate _create_user_prompt() methods
+   - ~20-30 lines duplicated per occurrence
+   - Estimated: 480-720 lines of duplicate code
+
+3. Result Model Field Duplication
+   - 15+ agents with duplicate severity field definitions
+   - Similar patterns for category, description, remediation fields
+   - Estimated: 64-96 lines of duplicate code
+
+4. Validation Logic Duplication
+   - 5+ API routes with duplicate validators
+   - SSRF protection code repeated
+   - Input validation logic repeated
+   - Estimated: 75-125 lines of duplicate code
+
+5. Formatting/Reporting Duplication
+   - 8 agents with duplicate metrics formatting
+   - 5+ agents with similar report generation
+   - Estimated: 180-320 lines of duplicate code
+
+TOTAL DUPLICATION ESTIMATE: 1,000 - 1,600+ LINES
+
+SOLUTION CREATED
+----------------
+Created shared utilities in aiops/utils/ (904 total lines):
+
+1. result_models.py (107 lines)
+   - BaseSeverityModel, BaseIssueModel, BaseAnalysisResult
+   - BaseVulnerability for security findings
+   - create_default_result() for error handling
+   - SeverityLevel enum
+
+2. agent_helpers.py (262 lines)
+   - handle_agent_error() - standard error handling
+   - log_agent_execution() - consistent logging
+   - create_system_prompt_template() - prompt generation
+   - create_user_prompt_template() - prompt generation
+   - format_dict_for_prompt() - data formatting
+   - extract_code_from_response() - response parsing
+
+3. validation.py (232 lines)
+   - validate_agent_type() - input validation
+   - validate_callback_url() - SSRF protection
+   - validate_input_data_size() - DoS prevention
+   - validate_metric_name() - metric validation
+   - validate_severity() - severity validation
+   - validate_limit() - pagination validation
+
+4. formatting.py (254 lines)
+   - format_metrics_dict() - metrics formatting
+   - format_list_for_prompt() - list formatting
+   - generate_markdown_report() - report generation
+   - format_table() - table generation
+   - format_code_block() - code formatting
+   - Plus utilities for timestamps, percentages, file sizes
+
+5. __init__.py (49 lines)
+   - Consolidated imports for easy access
+
+BENEFITS
+--------
+1. Code Reduction: 1,000-1,600 lines eliminated when fully adopted
+2. Maintainability: Single source of truth for common patterns
+3. Consistency: All agents use same error handling, logging, validation
+4. Testability: Utilities can be tested once, benefit all agents
+5. Development Speed: Faster agent development with reusable components
+6. Bug Reduction: Fixes applied once benefit all agents
+
+IMMEDIATE IMPACT
+----------------
+✓ New agent development can use utilities immediately
+✓ Refactoring existing agents will be faster and safer
+✓ API routes can consolidate validation logic
+✓ More consistent error messages and logging
+✓ Easier onboarding for new developers
+
+MIGRATION STRATEGY
+------------------
+Phase 1: Use for all new development (IMMEDIATE)
+Phase 2: Refactor on modification (ONGOING)
+Phase 3: Batch refactor similar agents (NEXT SPRINT)
+Phase 4: Complete migration (NEXT QUARTER)
+
+RISK ASSESSMENT
+---------------
+Risk: LOW
+- Utilities are additive (not breaking)
+- Backward compatible approach
+- Can migrate incrementally
+- Easy to revert if needed
+
+RECOMMENDATIONS
+---------------
+1. IMMEDIATE: Approve and merge utility modules
+2. IMMEDIATE: Update development guidelines to require utilities
+3. SHORT-TERM: Refactor 3-5 high-traffic agents as pilot
+4. SHORT-TERM: Add comprehensive unit tests
+5. LONG-TERM: Complete migration of all agents
+
+FILES CREATED
+-------------
+✓ /home/user/AIOps/aiops/utils/__init__.py
+✓ /home/user/AIOps/aiops/utils/result_models.py
+✓ /home/user/AIOps/aiops/utils/agent_helpers.py
+✓ /home/user/AIOps/aiops/utils/validation.py
+✓ /home/user/AIOps/aiops/utils/formatting.py
+✓ /home/user/AIOps/DUPLICATION_ANALYSIS_REPORT.md (detailed analysis)
+✓ /home/user/AIOps/UTILITY_USAGE_GUIDE.md (usage examples)
+✓ /home/user/AIOps/DUPLICATION_SUMMARY.txt (this file)
+
+NEXT ACTIONS
+------------
+[ ] Review utility modules
+[ ] Approve for merge
+[ ] Create unit tests
+[ ] Update development documentation
+[ ] Plan pilot refactoring
+[ ] Schedule team training
+
+================================================================================
+For detailed analysis, see: DUPLICATION_ANALYSIS_REPORT.md
+For usage examples, see: UTILITY_USAGE_GUIDE.md
+================================================================================

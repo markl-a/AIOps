@@ -28,6 +28,7 @@ class AsyncLockWrapper:
     def __init__(self):
         self._sync_lock = threading.Lock()
         self._async_lock: Optional[asyncio.Lock] = None
+        self._async_lock_creation_lock = threading.Lock()
 
     def __enter__(self):
         self._sync_lock.acquire()
@@ -40,12 +41,14 @@ class AsyncLockWrapper:
     async def async_lock(self):
         """Get async lock - creates one per event loop if needed."""
         if self._async_lock is None:
-            try:
-                # Create async lock in current event loop
-                self._async_lock = asyncio.Lock()
-            except RuntimeError:
-                # No event loop running, use sync lock
-                return self
+            with self._async_lock_creation_lock:
+                if self._async_lock is None:  # Double-check pattern
+                    try:
+                        # Create async lock in current event loop
+                        self._async_lock = asyncio.Lock()
+                    except RuntimeError:
+                        # No event loop running, use sync lock
+                        return self
         return self._async_lock
 
 
@@ -133,6 +136,28 @@ class SemanticCache:
             f"Semantic cache initialized: threshold={similarity_threshold}, "
             f"max_entries={max_entries}, ttl={ttl}s"
         )
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - cleanup resources."""
+        # Clear cache on exit to free memory
+        self.clear()
+        logger.debug("Semantic cache cleared on context exit")
+        return False
+
+    async def __aenter__(self):
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit - cleanup resources."""
+        # Same cleanup as sync version
+        self.clear()
+        logger.debug("Semantic cache cleared on async context exit")
+        return False
 
     def _normalize_prompt(self, prompt: str) -> str:
         """

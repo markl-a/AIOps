@@ -21,6 +21,11 @@ from aiops.api.routes import (
     webhooks,
     system,
 )
+from aiops.api.rate_limiter import (
+    AdvancedRateLimitMiddleware,
+    RateLimitConfig,
+    RateLimitRule,
+)
 from aiops.core.exceptions import AIOpsException
 from aiops.core.structured_logger import get_structured_logger
 from aiops.core.config import get_config
@@ -64,14 +69,93 @@ _in_production = _is_production()
 if _in_production:
     logger.info("Running in production mode - API documentation disabled")
 
+# Define OpenAPI tags with descriptions
+tags_metadata = [
+    {
+        "name": "Root",
+        "description": "Root endpoint providing API information and status",
+    },
+    {
+        "name": "Health",
+        "description": "Health check endpoints for monitoring service availability and dependencies. "
+                      "Includes liveness/readiness probes for Kubernetes deployments.",
+    },
+    {
+        "name": "Agents",
+        "description": "Agent execution and management endpoints. Execute AI agents for various DevOps tasks "
+                      "including code review, security scanning, test generation, and more. "
+                      "Supports both synchronous and asynchronous execution with configurable timeouts and retries.",
+    },
+    {
+        "name": "LLM",
+        "description": "LLM (Large Language Model) provider management. Generate text using various LLM providers "
+                      "with automatic failover, health monitoring, and cost tracking.",
+    },
+    {
+        "name": "Notifications",
+        "description": "Multi-channel notification system. Send notifications to Slack, Teams, email, and other channels. "
+                      "Track notification history and test channel configurations.",
+    },
+    {
+        "name": "Analytics",
+        "description": "Analytics and metrics endpoints. Retrieve system-wide metrics, agent performance data, "
+                      "cost breakdowns, usage trends, and error analytics.",
+    },
+    {
+        "name": "Webhooks",
+        "description": "Webhook endpoints for receiving events from external systems (GitHub, GitLab, Jira, PagerDuty). "
+                      "Automatically triggers workflows based on incoming events.",
+    },
+    {
+        "name": "System",
+        "description": "System configuration and status endpoints. View system information, runtime statistics, "
+                      "feature flags, and manage caches. Requires authentication.",
+    },
+]
+
 app = FastAPI(
     title="AIOps API",
-    description="AI-powered DevOps automation platform",
+    description="""
+# AIOps - AI-Powered DevOps Automation Platform
+
+The AIOps API provides comprehensive DevOps automation capabilities powered by AI agents and LLMs.
+
+## Key Features
+
+* **AI Agent Execution**: Execute specialized AI agents for code review, security scanning, test generation, and more
+* **Multi-LLM Support**: Automatic failover between OpenAI, Anthropic, Google, and other LLM providers
+* **Workflow Orchestration**: Chain multiple agents together in sequential, parallel, or waterfall execution modes
+* **Multi-Channel Notifications**: Send alerts to Slack, Teams, email, and other channels
+* **Webhook Integration**: Receive and process webhooks from GitHub, GitLab, Jira, and PagerDuty
+* **Analytics & Metrics**: Comprehensive tracking of costs, performance, and usage patterns
+* **Health Monitoring**: Detailed health checks for all system components and dependencies
+
+## Authentication
+
+Most endpoints require authentication using JWT tokens or API keys. See the Security section for details.
+
+## Rate Limiting
+
+API endpoints are rate-limited to ensure fair usage. Rate limit information is included in response headers.
+
+## Error Handling
+
+All errors follow a standardized format with error codes, messages, and optional details for debugging.
+    """,
     version="0.1.0",
     lifespan=lifespan,
     docs_url=None if _in_production else "/docs",
     redoc_url=None if _in_production else "/redoc",
     openapi_url=None if _in_production else "/openapi.json",
+    openapi_tags=tags_metadata,
+    contact={
+        "name": "AIOps Team",
+        "email": "support@aiops.example.com",
+    },
+    license_info={
+        "name": "Apache 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
+    },
 )
 
 
@@ -86,6 +170,37 @@ app.add_middleware(
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Rate limiting middleware with Redis support
+rate_limit_config = RateLimitConfig(
+    default_limit=100,
+    default_window=60,
+    use_redis=os.getenv("REDIS_URL") is not None,
+    redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+    excluded_paths=[
+        "/health",
+        "/health/liveness",
+        "/health/readiness",
+        "/metrics",
+        "/docs",
+        "/openapi.json",
+        "/redoc",
+        "/",
+    ],
+)
+
+# Add custom endpoint limits for high-cost operations
+rate_limit_config.endpoint_limits.update({
+    "/api/v1/agents/execute": RateLimitRule(requests=20, window=60),
+    "/api/v1/agents/workflows/execute": RateLimitRule(requests=10, window=60),
+    "/api/v1/llm/generate": RateLimitRule(requests=30, window=60),
+})
+
+app.add_middleware(
+    AdvancedRateLimitMiddleware,
+    config=rate_limit_config,
+    enabled=True,
+)
 
 
 # Request timing middleware

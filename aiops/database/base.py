@@ -37,18 +37,8 @@ class DatabaseManager:
         """
         config = get_config()
 
-        # Check for explicit database URL
-        if hasattr(config, "database_url") and config.database_url:
-            return config.database_url
-
-        # Build from components
-        db_user = getattr(config, "database_user", "aiops")
-        db_password = getattr(config, "database_password", "aiops")
-        db_host = getattr(config, "database_host", "localhost")
-        db_port = getattr(config, "database_port", 5432)
-        db_name = getattr(config, "database_name", "aiops")
-
-        return f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        # Use the centralized method from config
+        return config.get_database_url()
 
     def _setup_connection_pool_listeners(self):
         """Set up event listeners for connection pool monitoring."""
@@ -107,8 +97,9 @@ class DatabaseManager:
 
     def _setup_query_listeners(self):
         """Set up event listeners for query performance monitoring."""
-        # Track slow queries
-        slow_query_threshold_ms = 1000  # 1 second
+        # Get slow query threshold from config
+        config = get_config()
+        slow_query_threshold_ms = config.database_slow_query_threshold_ms
 
         @event.listens_for(self.engine, "before_cursor_execute")
         def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
@@ -156,27 +147,17 @@ class DatabaseManager:
             **kwargs: Additional engine arguments
         """
         try:
-            # Get environment-based pool size
-            import os
-            env = os.getenv("ENVIRONMENT", "development").lower()
-            is_production = env in ("production", "prod")
+            # Get config
+            config = get_config()
 
-            # Optimized pool settings based on environment
-            # Production: Larger pool for high concurrency
-            # Development: Smaller pool for resource efficiency
-            default_pool_size = 20 if is_production else 5
-            default_max_overflow = 40 if is_production else 10
-
-            # Default engine arguments with optimized settings
+            # Default engine arguments with optimized settings from config
             engine_args = {
                 "pool_pre_ping": True,  # Verify connections before using
-                "pool_size": int(os.getenv("DB_POOL_SIZE", default_pool_size)),
-                "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", default_max_overflow)),
-                "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", 3600)),  # Recycle after 1 hour
-                "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", 30)),  # Wait up to 30s for connection
-                "echo": os.getenv("DB_ECHO", "false").lower() == "true",
-                # Enable query statistics for PostgreSQL
-                "echo_pool": os.getenv("DB_ECHO_POOL", "false").lower() == "true",
+                "pool_size": config.database_pool_size,
+                "max_overflow": config.database_max_overflow,
+                "pool_recycle": config.database_pool_recycle,
+                "pool_timeout": config.database_pool_timeout,
+                "echo": config.database_echo,
                 # Connection arguments for better reliability
                 "connect_args": {
                     "connect_timeout": 10,  # Connection timeout in seconds
