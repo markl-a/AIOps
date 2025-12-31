@@ -54,10 +54,10 @@ class User(Base):
     updated_at = Column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
     last_login = Column(DateTime, nullable=True)
 
-    # Relationships with lazy loading optimization to prevent N+1 queries
-    api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan", lazy="selectinload")
-    executions = relationship("AgentExecution", back_populates="user", cascade="all, delete-orphan", lazy="selectinload")
-    audit_logs = relationship("AuditLog", back_populates="user", cascade="all, delete-orphan", lazy="selectinload")
+    # Relationships with lazy loading (use selectinload when querying to prevent N+1 queries)
+    api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
+    executions = relationship("AgentExecution", back_populates="user", cascade="all, delete-orphan")
+    audit_logs = relationship("AuditLog", back_populates="user", cascade="all, delete-orphan")
 
     __table_args__ = (
         # Composite index for common query pattern: active users with specific role
@@ -129,7 +129,7 @@ class AgentExecution(Base):
     llm_cost = Column(Float, default=0.0)
 
     # Metadata
-    metadata = Column(JSON, nullable=True)
+    execution_metadata = Column(JSON, nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="executions")
@@ -224,7 +224,7 @@ class CostTracking(Base):
     operation = Column(String(100), nullable=True)
 
     # Additional metadata
-    metadata = Column(JSON, nullable=True)
+    cost_metadata = Column(JSON, nullable=True)
 
     __table_args__ = (
         Index("idx_cost_timestamp", "timestamp"),
@@ -257,7 +257,7 @@ class SystemMetric(Base):
     tags = Column(JSON, nullable=True)  # e.g., {"environment": "production", "service": "api"}
 
     # Additional data
-    metadata = Column(JSON, nullable=True)
+    metric_metadata = Column(JSON, nullable=True)
 
     __table_args__ = (
         # Composite index for querying metrics by name and time range

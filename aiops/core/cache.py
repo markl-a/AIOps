@@ -7,7 +7,7 @@ import time
 import pickle
 import os
 import threading
-from typing import Any, Optional, Callable, Dict, List, TypeVar, Set
+from typing import Any, Optional, Callable, Dict, List, TypeVar, Set, Union
 from pathlib import Path
 from functools import wraps
 from aiops.core.logger import get_logger
@@ -177,11 +177,12 @@ class RedisBackend(CacheBackend):
         """
         for attempt in range(self.max_retries):
             try:
-                self.client.ping()
-                self.enabled = True
-                if attempt > 0:
-                    logger.info(f"Redis reconnected successfully after {attempt + 1} attempts")
-                return True
+                if self.client is not None:
+                    self.client.ping()
+                    self.enabled = True
+                    if attempt > 0:
+                        logger.info(f"Redis reconnected successfully after {attempt + 1} attempts")
+                    return True
             except Exception as e:
                 backoff_time = self.retry_backoff * (2 ** attempt)
                 if attempt < self.max_retries - 1:
@@ -211,8 +212,10 @@ class RedisBackend(CacheBackend):
 
         try:
             # Quick connection check
-            self.client.ping()
-            return True
+            if self.client is not None:
+                self.client.ping()
+                return True
+            return False
         except Exception as e:
             logger.warning(f"Redis connection lost: {e}. Attempting reconnection...")
             with self._connection_lock:
@@ -226,7 +229,7 @@ class RedisBackend(CacheBackend):
 
     def get(self, key: str) -> Optional[Any]:
         """Get value from Redis with automatic reconnection."""
-        if not self._ensure_connection():
+        if not self._ensure_connection() or self.client is None:
             return None
 
         try:
@@ -242,7 +245,7 @@ class RedisBackend(CacheBackend):
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None):
         """Set value in Redis with automatic reconnection."""
-        if not self._ensure_connection():
+        if not self._ensure_connection() or self.client is None:
             return
 
         try:
@@ -257,7 +260,7 @@ class RedisBackend(CacheBackend):
 
     def delete(self, key: str):
         """Delete key from Redis with automatic reconnection."""
-        if not self._ensure_connection():
+        if not self._ensure_connection() or self.client is None:
             return
 
         try:
@@ -275,7 +278,7 @@ class RedisBackend(CacheBackend):
         Returns:
             Number of keys deleted
         """
-        if not self._ensure_connection():
+        if not self._ensure_connection() or self.client is None:
             return 0
 
         try:
@@ -300,7 +303,7 @@ class RedisBackend(CacheBackend):
 
     def exists(self, key: str) -> bool:
         """Check if key exists with automatic reconnection."""
-        if not self._ensure_connection():
+        if not self._ensure_connection() or self.client is None:
             return False
 
         try:
@@ -339,7 +342,7 @@ class RedisBackend(CacheBackend):
             Health status dictionary
         """
         try:
-            if not self.enabled:
+            if not self.enabled or self.client is None:
                 return {
                     "status": "disconnected",
                     "enabled": False,
@@ -443,7 +446,7 @@ class Cache:
         self,
         cache_dir: str = ".aiops_cache",
         ttl: int = 3600,
-        enable_redis: bool = None,
+        enable_redis: Optional[bool] = None,
         enable_stampede_protection: bool = True,
     ):
         """
@@ -459,6 +462,7 @@ class Cache:
         self.hits = 0
         self.misses = 0
         self.enable_stampede_protection = enable_stampede_protection
+        self.backend: Union[RedisBackend, FileBackend]
 
         # Determine if Redis should be used
         if enable_redis is None:
@@ -598,6 +602,9 @@ class Cache:
 
 # Global cache instance
 _cache: Optional[Cache] = None
+
+# Alias for backward compatibility
+CacheManager = Cache
 
 
 def get_cache(ttl: int = 3600) -> Cache:

@@ -53,7 +53,7 @@ class AgentValidationError(AgentExecutionError):
 class AgentRetryExhaustedError(AgentExecutionError):
     """Exception raised when all retry attempts are exhausted."""
 
-    def __init__(self, agent_name: str, attempts: int, last_error: Exception):
+    def __init__(self, agent_name: str, attempts: int, last_error: Optional[Exception]):
         super().__init__(
             agent_name=agent_name,
             message=f"All {attempts} retry attempts failed",

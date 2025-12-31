@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from aiops.agents.anomaly_detector import (
     AnomalyDetectorAgent,
-    AnomalyReport,
+    AnomalyDetectionResult,
     Anomaly,
 )
 

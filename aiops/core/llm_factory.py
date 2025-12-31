@@ -192,6 +192,7 @@ class LLMFactory:
         llm_config["provider"] = provider
 
         # Create instance based on provider
+        instance: BaseLLM
         if provider == "openai":
             instance = OpenAILLM(llm_config)
         elif provider == "anthropic":

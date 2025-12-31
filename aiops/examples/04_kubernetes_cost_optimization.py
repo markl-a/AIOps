@@ -7,7 +7,7 @@ import asyncio
 import yaml
 from pathlib import Path
 from aiops.agents.k8s_optimizer import KubernetesOptimizerAgent
-from aiops.agents.cost_optimizer import CloudCostOptimizerAgent
+from aiops.agents.cost_optimizer import CloudCostOptimizer
 
 
 async def optimize_k8s_deployment(manifest_file: str):
@@ -142,7 +142,7 @@ async def analyze_namespace_costs(namespace: str = "production"):
     )
 
     # Optimize cloud costs
-    cost_optimizer = CloudCostOptimizerAgent()
+    cost_optimizer = CloudCostOptimizer()
     cost_result = await cost_optimizer.execute(
         resources=cloud_resources,
         cloud_provider="aws"

@@ -224,61 +224,63 @@ def load_config_from_env() -> LLMConfig:
     )
 
 
-# Example configurations
-EXAMPLE_CONFIGS = {
-    "openai_only": LLMConfig(
-        providers=[
-            ProviderConfig(
-                type=ProviderType.OPENAI,
-                api_key_env="OPENAI_API_KEY",
-                priority=1,
-            )
-        ],
-        failover_enabled=False,
-    ),
-    "openai_anthropic_failover": LLMConfig(
-        providers=[
-            ProviderConfig(
-                type=ProviderType.OPENAI,
-                api_key_env="OPENAI_API_KEY",
-                priority=2,  # Primary
-            ),
-            ProviderConfig(
-                type=ProviderType.ANTHROPIC,
-                api_key_env="ANTHROPIC_API_KEY",
-                priority=1,  # Fallback
-            ),
-        ],
-        failover_enabled=True,
-    ),
-    "multi_provider": LLMConfig(
-        providers=[
-            ProviderConfig(
-                type=ProviderType.OPENAI,
-                api_key_env="OPENAI_API_KEY",
-                priority=3,  # Highest priority
-                max_retries=3,
-                timeout=30.0,
-            ),
-            ProviderConfig(
-                type=ProviderType.ANTHROPIC,
-                api_key_env="ANTHROPIC_API_KEY",
-                priority=2,  # Second priority
-                max_retries=3,
-                timeout=30.0,
-            ),
-            ProviderConfig(
-                type=ProviderType.GOOGLE,
-                api_key_env="GOOGLE_API_KEY",
-                priority=1,  # Last resort
-                max_retries=2,
-                timeout=20.0,
-            ),
-        ],
-        failover_enabled=True,
-        health_check_interval=60,
-    ),
-}
+# Example configurations (commented out to avoid validation errors during import)
+# These can be constructed dynamically when needed
+# EXAMPLE_CONFIGS = {
+#     "openai_only": LLMConfig(
+#         providers=[
+#             ProviderConfig(
+#                 type=ProviderType.OPENAI,
+#                 api_key_env="OPENAI_API_KEY",
+#                 priority=1,
+#             )
+#         ],
+#         failover_enabled=False,
+#     ),
+#     "openai_anthropic_failover": LLMConfig(
+#         providers=[
+#             ProviderConfig(
+#                 type=ProviderType.OPENAI,
+#                 api_key_env="OPENAI_API_KEY",
+#                 priority=2,  # Primary
+#             ),
+#             ProviderConfig(
+#                 type=ProviderType.ANTHROPIC,
+#                 api_key_env="ANTHROPIC_API_KEY",
+#                 priority=1,  # Fallback
+#             ),
+#         ],
+#         failover_enabled=True,
+#     ),
+#     "multi_provider": LLMConfig(
+#         providers=[
+#             ProviderConfig(
+#                 type=ProviderType.OPENAI,
+#                 api_key_env="OPENAI_API_KEY",
+#                 priority=3,  # Highest priority
+#                 max_retries=3,
+#                 timeout=30.0,
+#             ),
+#             ProviderConfig(
+#                 type=ProviderType.ANTHROPIC,
+#                 api_key_env="ANTHROPIC_API_KEY",
+#                 priority=2,  # Second priority
+#                 max_retries=3,
+#                 timeout=30.0,
+#             ),
+#             ProviderConfig(
+#                 type=ProviderType.GOOGLE,
+#                 api_key_env="GOOGLE_API_KEY",
+#                 priority=1,  # Last resort
+#                 max_retries=2,
+#                 timeout=20.0,
+#             ),
+#         ],
+#         failover_enabled=True,
+#         health_check_interval=60,
+#     ),
+# }
+EXAMPLE_CONFIGS = {}
 
 
 def get_example_config(name: str) -> LLMConfig:

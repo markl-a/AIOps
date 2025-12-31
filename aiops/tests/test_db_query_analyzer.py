@@ -5,8 +5,9 @@ from unittest.mock import AsyncMock, patch
 from aiops.agents.db_query_analyzer import (
     DatabaseQueryAnalyzer,
     QueryAnalysisResult,
-    QueryIssue,
+    QueryOptimization,
     IndexRecommendation,
+    QueryIssue,
 )
 
 

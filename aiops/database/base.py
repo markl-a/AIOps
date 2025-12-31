@@ -9,7 +9,7 @@ from loguru import logger
 import time
 
 from aiops.core.config import get_config
-from aiops.core.exceptions import DatabaseError, ConnectionError as DBConnectionError
+from aiops.core.exceptions import DatabaseError, DatabaseConnectionError as DBConnectionError
 
 
 # Base class for all models

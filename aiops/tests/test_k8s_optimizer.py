@@ -5,8 +5,7 @@ from unittest.mock import AsyncMock, patch
 from aiops.agents.k8s_optimizer import (
     KubernetesOptimizerAgent,
     K8sOptimizationResult,
-    ResourceOptimization,
-    HPARecommendation,
+    ResourceRecommendation,
 )
 
 

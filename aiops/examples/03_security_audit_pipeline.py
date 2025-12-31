@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 from aiops.agents.security_scanner import SecurityScannerAgent
 from aiops.agents.dependency_analyzer import DependencyAnalyzerAgent
-from aiops.agents.secret_scanner import SecretScannerAgent
+from aiops.agents.secret_scanner import SecretScanner
 from aiops.agents.config_drift_detector import ConfigurationDriftDetector
 
 
@@ -23,7 +23,7 @@ class SecurityAuditPipeline:
     def __init__(self):
         self.security_scanner = SecurityScannerAgent()
         self.dependency_analyzer = DependencyAnalyzerAgent()
-        self.secret_scanner = SecretScannerAgent()
+        self.secret_scanner = SecretScanner()
         self.config_detector = ConfigurationDriftDetector()
 
         self.findings = {

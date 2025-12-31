@@ -83,9 +83,10 @@ class Config(BaseSettings):
 
     def get_llm_config(self, provider: Optional[str] = None) -> dict:
         """Get LLM configuration for specified provider."""
+        from typing import Any
         provider = provider or self.default_llm_provider
 
-        config = {
+        config: dict[str, Any] = {
             "temperature": self.default_temperature,
             "max_tokens": self.max_tokens,
         }

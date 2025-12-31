@@ -6,8 +6,7 @@ This example demonstrates automated disaster recovery planning and backup valida
 import asyncio
 import json
 from datetime import datetime, timedelta
-from aiops.agents.disaster_recovery import DisasterRecoveryAgent
-from aiops.agents.infrastructure_analyzer import InfrastructureAnalyzerAgent
+from aiops.agents.disaster_recovery import DisasterRecoveryPlanner
 
 
 async def generate_disaster_recovery_plan():
@@ -55,7 +54,7 @@ async def generate_disaster_recovery_plan():
         print(f"    RTO: {service['rto']}, RPO: {service['rpo']}")
 
     # Generate DR plan
-    dr_agent = DisasterRecoveryAgent()
+    dr_agent = DisasterRecoveryPlanner()
     result = await dr_agent.execute(infrastructure=infrastructure)
 
     print(f"\n\n📋 DR Plan Generated:")

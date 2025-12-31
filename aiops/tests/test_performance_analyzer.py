@@ -4,9 +4,8 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from aiops.agents.performance_analyzer import (
     PerformanceAnalyzerAgent,
-    PerformanceReport,
+    PerformanceAnalysisResult,
     PerformanceIssue,
-    Optimization,
 )
 
 

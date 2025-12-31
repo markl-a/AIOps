@@ -3,17 +3,17 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 from aiops.agents.disaster_recovery import (
-    DisasterRecoveryAgent,
-    DRPlan,
+    DisasterRecoveryPlanner,
+    DRPlanResult,
     RecoveryProcedure,
-    BackupStrategy,
+    BackupValidation,
 )
 
 
 @pytest.fixture
 def dr_agent():
     """Create disaster recovery agent."""
-    return DisasterRecoveryAgent()
+    return DisasterRecoveryPlanner()
 
 
 @pytest.fixture

@@ -117,7 +117,7 @@ async def get_timeseries_metrics(
     metric_names: List[str] = Query(..., description="Metric names to fetch", max_length=50),
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
-    aggregation: str = Query("avg", regex="^(avg|sum|min|max|count)$"),
+    aggregation: str = Query("avg", pattern="^(avg|sum|min|max|count)$"),
 ):
     """Get time series metrics."""
     # Validate number of metrics requested (prevent DoS)
