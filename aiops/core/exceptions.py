@@ -313,7 +313,8 @@ class APIError(AIOpsException):
         status_code: int = 500,
         endpoint: Optional[str] = None,
     ):
-        details = {"status_code": status_code}
+        from typing import Any
+        details: dict[str, Any] = {"status_code": status_code}
         if endpoint:
             details["endpoint"] = endpoint
 

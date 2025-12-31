@@ -224,9 +224,9 @@ class TokenTracker:
             # Filter records
             records = self.usage_records
             if start_time:
-                records = [r for r in records if r.timestamp >= start_time]
+                records = deque(r for r in records if r.timestamp >= start_time)
             if end_time:
-                records = [r for r in records if r.timestamp <= end_time]
+                records = deque(r for r in records if r.timestamp <= end_time)
 
             if not records:
                 return UsageStats(
@@ -249,19 +249,19 @@ class TokenTracker:
             total_tokens = 0
             total_cost = 0.0
 
-            by_model = defaultdict(lambda: {
+            by_model: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
                 "requests": 0,
                 "input_tokens": 0,
                 "output_tokens": 0,
                 "total_tokens": 0,
                 "cost": 0.0
             })
-            by_user = defaultdict(lambda: {
+            by_user: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
                 "requests": 0,
                 "tokens": 0,
                 "cost": 0.0
             })
-            by_agent = defaultdict(lambda: {
+            by_agent: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
                 "requests": 0,
                 "tokens": 0,
                 "cost": 0.0

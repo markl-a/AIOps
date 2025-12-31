@@ -24,6 +24,15 @@ class IndexRecommendation(BaseModel):
     ddl: str = Field(description="SQL DDL to create the index")
 
 
+class QueryIssue(BaseModel):
+    """Individual query issue"""
+    severity: str = Field(description="critical, high, medium, low")
+    category: str = Field(description="Category of issue")
+    description: str = Field(description="Description of the issue")
+    impact: str = Field(description="Impact of the issue")
+    suggestion: str = Field(description="Suggestion to fix the issue")
+
+
 class QueryOptimization(BaseModel):
     """Query optimization suggestion"""
     issue_type: str = Field(description="Type of issue (N+1, missing index, full scan, etc.)")

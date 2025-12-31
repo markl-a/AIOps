@@ -3,17 +3,16 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 from aiops.agents.cost_optimizer import (
-    CloudCostOptimizerAgent,
+    CloudCostOptimizer,
     CostOptimizationResult,
     CostSaving,
-    ResourceRecommendation,
 )
 
 
 @pytest.fixture
 def cost_agent():
     """Create cost optimizer agent."""
-    return CloudCostOptimizerAgent()
+    return CloudCostOptimizer()
 
 
 @pytest.fixture

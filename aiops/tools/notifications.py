@@ -279,3 +279,7 @@ Review and run the generated tests!
 """
 
         await NotificationService.send_slack(message)
+
+
+# Alias for backward compatibility
+NotificationManager = NotificationService

@@ -136,7 +136,8 @@ class StructuredLogger:
             duration_ms: Execution duration in milliseconds
             **kwargs: Additional context
         """
-        context = {
+        from typing import Any
+        context: dict[str, Any] = {
             "agent_name": agent_name,
             "operation": operation,
             "status": status,
@@ -174,7 +175,8 @@ class StructuredLogger:
             duration_ms: Request duration
             **kwargs: Additional context
         """
-        context = {
+        from typing import Any
+        context: dict[str, Any] = {
             "provider": provider,
             "model": model,
             "event_type": "llm_request",

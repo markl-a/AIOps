@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, patch
 from aiops.agents.log_analyzer import (
     LogAnalyzerAgent,
     LogAnalysisResult,
-    LogPattern,
-    RootCause,
+    LogInsight,
+    RootCauseAnalysis,
 )
 
 

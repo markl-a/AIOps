@@ -22,6 +22,17 @@ logger = get_logger(__name__)
 # Password/API Key hashing context using bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against its hash."""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    """Hash a password."""
+    return pwd_context.hash(password)
+
+
 # Configuration
 def _get_jwt_secret() -> str:
     """Get JWT secret key from environment. Fails if not configured."""
