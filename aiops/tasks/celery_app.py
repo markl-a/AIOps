@@ -13,9 +13,9 @@ def create_celery_app() -> Celery:
     """
     config = get_config()
 
-    # Get broker and result backend URLs
-    broker_url = getattr(config, "celery_broker_url", "redis://localhost:6379/0")
-    result_backend = getattr(config, "celery_result_backend", "redis://localhost:6379/0")
+    # Get broker and result backend URLs from config
+    broker_url = config.get_celery_broker_url()
+    result_backend = config.get_celery_result_backend()
 
     # Create Celery app
     app = Celery(
@@ -29,7 +29,7 @@ def create_celery_app() -> Celery:
         ],
     )
 
-    # Configure Celery
+    # Configure Celery with config values
     app.conf.update(
         # Task settings
         task_serializer="json",
@@ -44,14 +44,14 @@ def create_celery_app() -> Celery:
         # Result backend settings
         result_expires=3600,  # 1 hour
         result_persistent=True,
-        # Task execution settings
+        # Task execution settings from config
         task_acks_late=True,
         task_reject_on_worker_lost=True,
-        task_time_limit=600,  # 10 minutes
-        task_soft_time_limit=540,  # 9 minutes
-        # Worker settings
+        task_time_limit=config.celery_task_time_limit,
+        task_soft_time_limit=config.celery_task_soft_time_limit,
+        # Worker settings from config
         worker_prefetch_multiplier=4,
-        worker_max_tasks_per_child=1000,
+        worker_max_tasks_per_child=config.celery_worker_max_tasks_per_child,
         # Monitoring
         worker_send_task_events=True,
         task_send_sent_event=True,

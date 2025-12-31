@@ -80,35 +80,110 @@ class LLMGenerateRequest(BaseModel):
 class LLMGenerateResponse(BaseModel):
     """Response from LLM generation."""
 
-    text: str
-    provider: str
-    model: str
-    tokens_used: int
-    cost_usd: float
+    text: str = Field(..., description="Generated text response from the LLM")
+    provider: str = Field(..., description="LLM provider used (e.g., openai, anthropic, google)")
+    model: str = Field(..., description="Specific model used for generation")
+    tokens_used: int = Field(..., description="Total number of tokens consumed")
+    cost_usd: float = Field(..., description="Estimated cost in USD for this generation")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "text": "Here is the generated response based on your prompt...",
+                "provider": "openai",
+                "model": "gpt-4-turbo-preview",
+                "tokens_used": 150,
+                "cost_usd": 0.0045
+            }
+        }
 
 
 class ProviderHealthResponse(BaseModel):
     """Health status of LLM providers."""
 
-    provider: str
-    status: str
-    success_rate: float
-    total_requests: int
-    last_success: Optional[str] = None
-    last_failure: Optional[str] = None
+    provider: str = Field(..., description="Provider name (openai, anthropic, google, etc.)")
+    status: str = Field(..., description="Health status: healthy, degraded, or unhealthy")
+    success_rate: float = Field(..., description="Success rate as a decimal (0.0 to 1.0)", ge=0.0, le=1.0)
+    total_requests: int = Field(..., description="Total number of requests made to this provider", ge=0)
+    last_success: Optional[str] = Field(None, description="ISO 8601 timestamp of last successful request")
+    last_failure: Optional[str] = Field(None, description="ISO 8601 timestamp of last failed request")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "provider": "openai",
+                "status": "healthy",
+                "success_rate": 0.985,
+                "total_requests": 1245,
+                "last_success": "2024-01-15T10:30:00Z",
+                "last_failure": None
+            }
+        }
 
 
 class LLMStatsResponse(BaseModel):
     """LLM usage statistics."""
 
-    total_requests: int
-    total_tokens: int
-    total_cost_usd: float
-    requests_by_provider: Dict[str, int]
-    average_response_time_ms: float
+    total_requests: int = Field(..., description="Total number of LLM requests across all providers", ge=0)
+    total_tokens: int = Field(..., description="Total number of tokens consumed", ge=0)
+    total_cost_usd: float = Field(..., description="Total cost in USD across all providers", ge=0.0)
+    requests_by_provider: Dict[str, int] = Field(..., description="Request count breakdown by provider")
+    average_response_time_ms: float = Field(..., description="Average response time in milliseconds", ge=0.0)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "total_requests": 2533,
+                "total_tokens": 1245678,
+                "total_cost_usd": 124.56,
+                "requests_by_provider": {
+                    "openai": 1245,
+                    "anthropic": 856,
+                    "google": 432
+                },
+                "average_response_time_ms": 387.5
+            }
+        }
 
 
-@router.post("/generate", response_model=LLMGenerateResponse)
+@router.post(
+    "/generate",
+    response_model=LLMGenerateResponse,
+    summary="Generate text with LLM",
+    description="""Generate text using an LLM with automatic failover between providers.
+
+    Features:
+    - Automatic provider failover for high availability
+    - Configurable model selection
+    - Temperature control for response creativity
+    - Token limit configuration
+    - Cost tracking and optimization
+    - Input sanitization and validation
+    """,
+    responses={
+        200: {"description": "Text generated successfully"},
+        400: {
+            "description": "Invalid request parameters",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "ValidationError",
+                        "message": "Request validation failed",
+                        "details": [{"field": "prompt", "message": "Prompt cannot be empty"}]
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "LLM generation failed",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "LLM generation failed: All providers unavailable"}
+                }
+            }
+        }
+    }
+)
 async def generate_text(request: LLMGenerateRequest):
     """Generate text using LLM with automatic failover."""
     logger.info(

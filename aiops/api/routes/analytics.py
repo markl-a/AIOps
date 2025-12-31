@@ -32,39 +32,78 @@ def validate_metric_name(metric_name: str) -> bool:
 class MetricDataPoint(BaseModel):
     """Single metric data point."""
 
-    timestamp: datetime
-    value: float
-    labels: Optional[Dict[str, str]] = None
+    timestamp: datetime = Field(..., description="Timestamp of this data point")
+    value: float = Field(..., description="Metric value")
+    labels: Optional[Dict[str, str]] = Field(None, description="Additional labels for this data point")
 
 
 class MetricResponse(BaseModel):
     """Metric response."""
 
-    metric_name: str
-    data_points: List[MetricDataPoint]
-    unit: str
-    aggregation: str
+    metric_name: str = Field(..., description="Name of the metric")
+    data_points: List[MetricDataPoint] = Field(..., description="Time series data points")
+    unit: str = Field(..., description="Unit of measurement (percent, count, ms, etc.)")
+    aggregation: str = Field(..., description="Aggregation method used (avg, sum, min, max, count)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "metric_name": "cpu_usage",
+                "data_points": [
+                    {
+                        "timestamp": "2024-01-15T10:30:00Z",
+                        "value": 75.5,
+                        "labels": {"environment": "production"}
+                    }
+                ],
+                "unit": "percent",
+                "aggregation": "avg"
+            }
+        }
 
 
 class SystemMetrics(BaseModel):
     """System-wide metrics."""
 
-    total_agents_executed: int
-    total_llm_requests: int
-    total_cost_usd: float
-    average_execution_time_ms: float
-    error_rate: float
-    uptime_percentage: float
+    total_agents_executed: int = Field(..., description="Total number of agent executions", ge=0)
+    total_llm_requests: int = Field(..., description="Total number of LLM requests", ge=0)
+    total_cost_usd: float = Field(..., description="Total cost in USD", ge=0.0)
+    average_execution_time_ms: float = Field(..., description="Average agent execution time in milliseconds", ge=0.0)
+    error_rate: float = Field(..., description="Error rate as decimal (0.0 to 1.0)", ge=0.0, le=1.0)
+    uptime_percentage: float = Field(..., description="System uptime percentage", ge=0.0, le=100.0)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "total_agents_executed": 2533,
+                "total_llm_requests": 15678,
+                "total_cost_usd": 245.67,
+                "average_execution_time_ms": 1250.5,
+                "error_rate": 0.015,
+                "uptime_percentage": 99.95
+            }
+        }
 
 
 class AgentMetrics(BaseModel):
     """Metrics for a specific agent."""
 
-    agent_type: str
-    total_executions: int
-    success_rate: float
-    average_duration_ms: float
-    total_cost_usd: float
+    agent_type: str = Field(..., description="Type of agent")
+    total_executions: int = Field(..., description="Total number of executions", ge=0)
+    success_rate: float = Field(..., description="Success rate as decimal (0.0 to 1.0)", ge=0.0, le=1.0)
+    average_duration_ms: float = Field(..., description="Average execution duration in milliseconds", ge=0.0)
+    total_cost_usd: float = Field(..., description="Total cost for this agent in USD", ge=0.0)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "agent_type": "code_reviewer",
+                "total_executions": 456,
+                "success_rate": 0.985,
+                "average_duration_ms": 2350.5,
+                "total_cost_usd": 45.67
+            }
+        }
 
 
 @router.get("/metrics/system", response_model=SystemMetrics)

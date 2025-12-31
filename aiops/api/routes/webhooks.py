@@ -104,24 +104,51 @@ async def github_webhook(
     - X-Hub-Signature-256: HMAC signature
     - X-GitHub-Delivery: Delivery ID
     """
-    logger.info(f"Received GitHub webhook: {x_github_event} (delivery: {x_github_delivery})")
+    try:
+        logger.info(f"Received GitHub webhook: {x_github_event} (delivery: {x_github_delivery})")
 
-    # Get raw payload
-    payload = await request.body()
+        # Validate required headers
+        if not x_github_event:
+            from fastapi import HTTPException, status
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing X-GitHub-Event header"
+            )
 
-    # Get all headers
-    headers = dict(request.headers)
+        # Get raw payload
+        try:
+            payload = await request.body()
+        except Exception as e:
+            logger.error(f"Failed to read webhook payload: {e}")
+            from fastapi import HTTPException, status
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid request payload"
+            )
 
-    # Route webhook (in background to avoid blocking)
-    background_tasks.add_task(
-        webhook_router.route_webhook,
-        source="github",
-        headers=headers,
-        payload=payload,
-        signature=x_hub_signature_256,
-    )
+        # Get all headers
+        headers = dict(request.headers)
 
-    return {"status": "accepted", "event": x_github_event}
+        # Route webhook (in background to avoid blocking)
+        background_tasks.add_task(
+            webhook_router.route_webhook,
+            source="github",
+            headers=headers,
+            payload=payload,
+            signature=x_hub_signature_256,
+        )
+
+        return {"status": "accepted", "event": x_github_event}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"GitHub webhook processing failed: {e}", exc_info=True)
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Webhook processing failed: {str(e)}"
+        )
 
 
 @router.post("/gitlab")
@@ -138,24 +165,51 @@ async def gitlab_webhook(
     - X-Gitlab-Event: Event type
     - X-Gitlab-Token: Webhook token
     """
-    logger.info(f"Received GitLab webhook: {x_gitlab_event}")
+    try:
+        logger.info(f"Received GitLab webhook: {x_gitlab_event}")
 
-    # Get raw payload
-    payload = await request.body()
+        # Validate required headers
+        if not x_gitlab_event:
+            from fastapi import HTTPException, status
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing X-Gitlab-Event header"
+            )
 
-    # Get all headers
-    headers = dict(request.headers)
+        # Get raw payload
+        try:
+            payload = await request.body()
+        except Exception as e:
+            logger.error(f"Failed to read webhook payload: {e}")
+            from fastapi import HTTPException, status
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid request payload"
+            )
 
-    # Route webhook
-    background_tasks.add_task(
-        webhook_router.route_webhook,
-        source="gitlab",
-        headers=headers,
-        payload=payload,
-        signature=x_gitlab_token,
-    )
+        # Get all headers
+        headers = dict(request.headers)
 
-    return {"status": "accepted", "event": x_gitlab_event}
+        # Route webhook
+        background_tasks.add_task(
+            webhook_router.route_webhook,
+            source="gitlab",
+            headers=headers,
+            payload=payload,
+            signature=x_gitlab_token,
+        )
+
+        return {"status": "accepted", "event": x_gitlab_event}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"GitLab webhook processing failed: {e}", exc_info=True)
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Webhook processing failed: {str(e)}"
+        )
 
 
 @router.post("/jira")
@@ -168,23 +222,42 @@ async def jira_webhook(
 
     Jira sends event type in the payload body.
     """
-    logger.info("Received Jira webhook")
+    try:
+        logger.info("Received Jira webhook")
 
-    # Get raw payload
-    payload = await request.body()
+        # Get raw payload
+        try:
+            payload = await request.body()
+        except Exception as e:
+            logger.error(f"Failed to read webhook payload: {e}")
+            from fastapi import HTTPException, status
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid request payload"
+            )
 
-    # Get all headers
-    headers = dict(request.headers)
+        # Get all headers
+        headers = dict(request.headers)
 
-    # Route webhook
-    background_tasks.add_task(
-        webhook_router.route_webhook,
-        source="jira",
-        headers=headers,
-        payload=payload,
-    )
+        # Route webhook
+        background_tasks.add_task(
+            webhook_router.route_webhook,
+            source="jira",
+            headers=headers,
+            payload=payload,
+        )
 
-    return {"status": "accepted"}
+        return {"status": "accepted"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Jira webhook processing failed: {e}", exc_info=True)
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Webhook processing failed: {str(e)}"
+        )
 
 
 @router.post("/pagerduty")
@@ -199,32 +272,59 @@ async def pagerduty_webhook(
     Headers:
     - X-PagerDuty-Signature: HMAC signature
     """
-    logger.info("Received PagerDuty webhook")
+    try:
+        logger.info("Received PagerDuty webhook")
 
-    # Get raw payload
-    payload = await request.body()
+        # Get raw payload
+        try:
+            payload = await request.body()
+        except Exception as e:
+            logger.error(f"Failed to read webhook payload: {e}")
+            from fastapi import HTTPException, status
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid request payload"
+            )
 
-    # Get all headers
-    headers = dict(request.headers)
+        # Get all headers
+        headers = dict(request.headers)
 
-    # Route webhook
-    background_tasks.add_task(
-        webhook_router.route_webhook,
-        source="pagerduty",
-        headers=headers,
-        payload=payload,
-        signature=x_pagerduty_signature,
-    )
+        # Route webhook
+        background_tasks.add_task(
+            webhook_router.route_webhook,
+            source="pagerduty",
+            headers=headers,
+            payload=payload,
+            signature=x_pagerduty_signature,
+        )
 
-    return {"status": "accepted"}
+        return {"status": "accepted"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"PagerDuty webhook processing failed: {e}", exc_info=True)
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Webhook processing failed: {str(e)}"
+        )
 
 
 @router.get("/status")
 async def webhook_status():
     """Get webhook system status"""
-    return {
-        "status": "operational",
-        "handlers": list(webhook_router.handlers.keys()),
-        "workflows": list(webhook_router.workflows.keys()),
-        "event_mappings": len(webhook_router.event_mappings),
-    }
+    try:
+        return {
+            "status": "operational",
+            "handlers": list(webhook_router.handlers.keys()),
+            "workflows": list(webhook_router.workflows.keys()),
+            "event_mappings": len(webhook_router.event_mappings),
+        }
+    except Exception as e:
+        logger.error(f"Failed to get webhook status: {e}")
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve webhook status: {str(e)}"
+        )

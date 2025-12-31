@@ -18,8 +18,10 @@ Usage:
 """
 
 import importlib
+import threading
 from typing import Any, Dict, List, Optional, Type
 from dataclasses import dataclass, field
+from collections import OrderedDict
 from aiops.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -43,13 +45,20 @@ class AgentRegistry:
 
     Agents are registered with their module path and class name,
     but are only imported and instantiated when first requested.
+    Instances are cached with LRU eviction to prevent unbounded memory growth.
     """
 
-    def __init__(self):
-        """Initialize the agent registry."""
+    def __init__(self, max_cached_instances: int = 50):
+        """Initialize the agent registry.
+
+        Args:
+            max_cached_instances: Maximum number of agent instances to cache.
+                                 Older instances are evicted using LRU policy. Default: 50"""
+        self._max_cached_instances = max_cached_instances
         self._registry: Dict[str, AgentInfo] = {}
-        self._instances: Dict[str, Any] = {}
+        self._instances: OrderedDict[str, Any] = OrderedDict()
         self._classes: Dict[str, Type] = {}
+        self._lock = threading.Lock()
 
         # Auto-register built-in agents
         self._register_builtin_agents()
@@ -224,18 +233,19 @@ class AgentRegistry:
             category: Agent category for grouping
             tags: Tags for filtering and search
         """
-        if name in self._registry:
-            logger.warning(f"Agent '{name}' already registered, overwriting")
+        with self._lock:
+            if name in self._registry:
+                logger.warning(f"Agent '{name}' already registered, overwriting")
 
-        self._registry[name] = AgentInfo(
-            name=name,
-            module_path=module_path,
-            class_name=class_name,
-            description=description,
-            category=category,
-            tags=tags or [],
-        )
-        logger.debug(f"Registered agent: {name} ({module_path}.{class_name})")
+            self._registry[name] = AgentInfo(
+                name=name,
+                module_path=module_path,
+                class_name=class_name,
+                description=description,
+                category=category,
+                tags=tags or [],
+            )
+            logger.debug(f"Registered agent: {name} ({module_path}.{class_name})")
 
     def _load_class(self, name: str) -> Type:
         """
@@ -251,20 +261,26 @@ class AgentRegistry:
             KeyError: If agent not registered
             ImportError: If module cannot be imported
         """
-        if name not in self._registry:
-            raise KeyError(f"Agent '{name}' not registered")
+        with self._lock:
+            if name not in self._registry:
+                raise KeyError(f"Agent '{name}' not registered")
 
-        if name in self._classes:
-            return self._classes[name]
+            if name in self._classes:
+                return self._classes[name]
 
-        info = self._registry[name]
+            info = self._registry[name]
 
+        # Load module outside lock to avoid holding lock during import
         try:
             logger.debug(f"Loading agent class: {info.module_path}.{info.class_name}")
             module = importlib.import_module(info.module_path)
             agent_class = getattr(module, info.class_name)
-            self._classes[name] = agent_class
-            info.is_loaded = True
+
+            # Store in cache with lock
+            with self._lock:
+                self._classes[name] = agent_class
+                info.is_loaded = True
+
             logger.info(f"Loaded agent: {name}")
             return agent_class
         except ImportError as e:
@@ -303,14 +319,16 @@ class AgentRegistry:
         Returns:
             Agent instance
         """
-        if use_cache and name in self._instances:
-            return self._instances[name]
+        with self._lock:
+            if use_cache and name in self._instances:
+                return self._instances[name]
 
         agent_class = self._load_class(name)
         instance = agent_class(**kwargs)
 
         if use_cache:
-            self._instances[name] = instance
+            with self._lock:
+                self._instances[name] = instance
 
         return instance
 
@@ -331,14 +349,16 @@ class AgentRegistry:
         Returns:
             Agent instance
         """
-        if use_cache and name in self._instances:
-            return self._instances[name]
+        with self._lock:
+            if use_cache and name in self._instances:
+                return self._instances[name]
 
         agent_class = self._load_class(name)
         instance = agent_class(**kwargs)
 
         if use_cache:
-            self._instances[name] = instance
+            with self._lock:
+                self._instances[name] = instance
 
         return instance
 
@@ -359,7 +379,8 @@ class AgentRegistry:
         Returns:
             List of agent info objects
         """
-        agents = list(self._registry.values())
+        with self._lock:
+            agents = list(self._registry.values())
 
         if category:
             agents = [a for a in agents if a.category == category]
@@ -374,11 +395,13 @@ class AgentRegistry:
 
     def list_categories(self) -> List[str]:
         """Get list of all agent categories."""
-        return list(set(a.category for a in self._registry.values()))
+        with self._lock:
+            return list(set(a.category for a in self._registry.values()))
 
     def is_registered(self, name: str) -> bool:
         """Check if agent is registered."""
-        return name in self._registry
+        with self._lock:
+            return name in self._registry
 
     def has_agent(self, name: str) -> bool:
         """Check if agent is registered (alias for is_registered)."""
@@ -386,7 +409,8 @@ class AgentRegistry:
 
     def is_loaded(self, name: str) -> bool:
         """Check if agent is loaded."""
-        return name in self._classes
+        with self._lock:
+            return name in self._classes
 
     def unload(self, name: str) -> bool:
         """
@@ -398,31 +422,34 @@ class AgentRegistry:
         Returns:
             True if agent was unloaded
         """
-        if name in self._instances:
-            del self._instances[name]
+        with self._lock:
+            if name in self._instances:
+                del self._instances[name]
 
-        if name in self._classes:
-            del self._classes[name]
-            if name in self._registry:
-                self._registry[name].is_loaded = False
-            logger.info(f"Unloaded agent: {name}")
-            return True
+            if name in self._classes:
+                del self._classes[name]
+                if name in self._registry:
+                    self._registry[name].is_loaded = False
+                logger.info(f"Unloaded agent: {name}")
+                return True
 
-        return False
+            return False
 
     def clear_cache(self) -> None:
         """Clear all cached instances."""
-        self._instances.clear()
-        logger.info("Cleared agent instance cache")
+        with self._lock:
+            self._instances.clear()
+            logger.info("Cleared agent instance cache")
 
     def get_stats(self) -> Dict[str, Any]:
         """Get registry statistics."""
-        return {
-            "registered": len(self._registry),
-            "loaded": len(self._classes),
-            "cached_instances": len(self._instances),
-            "categories": self.list_categories(),
-        }
+        with self._lock:
+            return {
+                "registered": len(self._registry),
+                "loaded": len(self._classes),
+                "cached_instances": len(self._instances),
+                "categories": self.list_categories(),
+            }
 
 
 # Global registry instance

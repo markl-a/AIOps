@@ -347,13 +347,15 @@ class TokenTracker:
             with open(self.storage_file, "r") as f:
                 data = json.load(f)
 
-            self.usage_records = [
+            # Load records into deque (not list) to maintain maxlen behavior
+            records = [
                 TokenUsage(
                     timestamp=datetime.fromisoformat(r["timestamp"]),
                     **{k: v for k, v in r.items() if k != "timestamp"}
                 )
                 for r in data.get("records", [])
             ]
+            self.usage_records = deque(records, maxlen=self.max_records)
             self.total_cost = data.get("total_cost", 0.0)
             self.total_tokens = data.get("total_tokens", 0)
 
@@ -389,17 +391,21 @@ class TokenTracker:
 
 # Global token tracker instance
 _global_tracker: Optional[TokenTracker] = None
+_global_tracker_lock = threading.Lock()
 
 
 def get_token_tracker() -> TokenTracker:
     """Get global token tracker instance."""
     global _global_tracker
     if _global_tracker is None:
-        _global_tracker = TokenTracker()
+        with _global_tracker_lock:
+            if _global_tracker is None:  # Double-check pattern
+                _global_tracker = TokenTracker()
     return _global_tracker
 
 
 def set_token_tracker(tracker: TokenTracker):
     """Set global token tracker instance."""
     global _global_tracker
-    _global_tracker = tracker
+    with _global_tracker_lock:
+        _global_tracker = tracker

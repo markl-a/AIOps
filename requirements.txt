@@ -1,62 +1,92 @@
-# Core dependencies
-openai>=1.0.0
-anthropic>=0.30.0
-google-generativeai>=0.3.0
-langchain>=0.2.0
-langchain-openai>=0.0.5
-langchain-anthropic>=0.1.0
+# ==============================================================================
+# AIOps Production Dependencies
+# ==============================================================================
+# Updated: 2025-12-31
+# Python: >=3.11
+#
+# Version Constraint Strategy:
+# - Use ~= for compatible releases (allows patch updates, blocks breaking changes)
+# - Use >= with < for specific compatibility requirements
+# - Pin exact versions only when necessary for stability
+#
+# Security Notes:
+# - python-jose replaced with PyJWT (more actively maintained, no ecdsa CVE)
+# - bcrypt pinned to 4.x for passlib compatibility
+# - Regular security audits recommended: pip-audit -r requirements.txt
+# ==============================================================================
 
-# Web framework
-fastapi>=0.109.0
-uvicorn>=0.27.0
-pydantic>=2.0.0
-pydantic-settings>=2.0.0
+# Core AI/LLM Dependencies
+# ------------------------------------------------------------------------------
+openai~=2.0                      # OpenAI API client
+anthropic~=0.30                  # Anthropic Claude API client
+google-generativeai~=0.8         # Google Gemini API client
+langchain~=1.0                   # LangChain framework
+langchain-openai~=1.0            # LangChain OpenAI integration
+langchain-anthropic~=1.0         # LangChain Anthropic integration
 
-# DevOps tools
-gitpython>=3.1.0
-pyyaml>=6.0
-python-dotenv>=1.0.0
+# Web Framework & API
+# ------------------------------------------------------------------------------
+fastapi~=0.109,>=0.109.0         # Modern async web framework
+uvicorn[standard]~=0.27          # ASGI server with performance extras
+pydantic~=2.0,>=2.0.0            # Data validation using Python type hints
+pydantic-settings~=2.0           # Settings management for pydantic
 
-# Monitoring & Logging
-prometheus-client>=0.19.0
-loguru>=0.7.0
+# DevOps & Configuration
+# ------------------------------------------------------------------------------
+gitpython~=3.1,>=3.1.0           # Git repository interaction
+pyyaml~=6.0,>=6.0.2              # YAML parser (security patches)
+python-dotenv~=1.0               # Environment variable management
 
-# CLI
-click>=8.1.0
-rich>=13.0.0
-typer>=0.9.0
+# Monitoring, Logging & Observability
+# ------------------------------------------------------------------------------
+prometheus-client~=0.19          # Prometheus metrics exporter
+loguru~=0.7                      # Advanced logging library
+sentry-sdk~=2.0,>=2.0.0          # Error tracking and monitoring
 
-# Utilities
-requests>=2.31.0
-aiohttp>=3.9.0
-tenacity>=8.2.0
-httpx>=0.26.0
-psutil>=5.9.0
+# OpenTelemetry Stack (Distributed Tracing)
+opentelemetry-api~=1.21          # OpenTelemetry API
+opentelemetry-sdk~=1.21          # OpenTelemetry SDK
+opentelemetry-instrumentation-fastapi>=0.42b0,<0.70  # FastAPI auto-instrumentation
+opentelemetry-instrumentation-sqlalchemy>=0.42b0,<0.70  # SQLAlchemy auto-instrumentation
+opentelemetry-instrumentation-redis>=0.42b0,<0.70       # Redis auto-instrumentation
+opentelemetry-instrumentation-requests>=0.42b0,<0.70    # Requests auto-instrumentation
+opentelemetry-exporter-otlp-proto-grpc~=1.21            # OTLP gRPC exporter
 
-# Database
-sqlalchemy>=2.0.0
-alembic>=1.13.0
-psycopg2-binary>=2.9.0
+# CLI & User Interface
+# ------------------------------------------------------------------------------
+click~=8.1                       # CLI framework
+rich~=13.0                       # Rich text and formatting in terminal
+typer~=0.9                       # CLI builder based on Click
 
-# Async Task Queue
-celery>=5.3.0
-kombu>=5.3.0
+# HTTP & Network Utilities
+# ------------------------------------------------------------------------------
+requests~=2.32,>=2.32.0          # HTTP library (security patches)
+aiohttp~=3.9,>=3.9.0             # Async HTTP client/server
+httpx~=0.26                      # Modern async HTTP client
+tenacity~=8.2                    # Retry library with exponential backoff
+
+# System & Process Utilities
+# ------------------------------------------------------------------------------
+psutil~=5.9                      # System and process monitoring
+
+# Database & ORM
+# ------------------------------------------------------------------------------
+sqlalchemy~=2.0,>=2.0.0          # SQL toolkit and ORM
+alembic~=1.13                    # Database migration tool
+psycopg2-binary~=2.9             # PostgreSQL adapter
+
+# Async Task Queue & Message Broker
+# ------------------------------------------------------------------------------
+celery~=5.3,>=5.3.0              # Distributed task queue
+kombu~=5.3                       # Messaging library for Celery
+redis~=5.0,>=5.0.0               # Redis client for caching/queues
 
 # Security & Authentication
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-bcrypt>=4.0.0,<5.0.0  # Pin to 4.x for passlib compatibility
-python-multipart>=0.0.6
-redis>=5.0.0
-
-# Error Tracking
-sentry-sdk>=1.40.0
-
-# Observability & Tracing
-opentelemetry-api>=1.21.0
-opentelemetry-sdk>=1.21.0
-opentelemetry-instrumentation-fastapi>=0.42b0
-opentelemetry-instrumentation-sqlalchemy>=0.42b0
-opentelemetry-instrumentation-redis>=0.42b0
-opentelemetry-instrumentation-requests>=0.42b0
-opentelemetry-exporter-otlp-proto-grpc>=1.21.0
+# ------------------------------------------------------------------------------
+# NOTE: Replaced python-jose with PyJWT to avoid ecdsa CVE-2024-23342
+# PyJWT is more actively maintained and provides the same JWT functionality
+pyjwt[crypto]~=2.10,>=2.10.0     # JWT encoding/decoding with cryptography
+passlib[bcrypt]~=1.7.4           # Password hashing library
+bcrypt>=4.0.0,<5.0.0             # bcrypt hashing (pinned for passlib compatibility)
+python-multipart~=0.0.6          # Multipart form data parser
+cryptography~=46.0,>=46.0.0      # Cryptographic recipes and primitives

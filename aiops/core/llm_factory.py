@@ -1,5 +1,6 @@
 """LLM Factory for creating and managing LLM instances."""
 
+import threading
 from typing import Optional, Any, Dict
 from abc import ABC, abstractmethod
 from langchain_openai import ChatOpenAI
@@ -100,7 +101,9 @@ class OpenAILLM(BaseLLM):
         messages.append(HumanMessage(content=prompt))
 
         try:
+            logger.debug(f"OpenAI request: model={self.model}, prompt_length={len(prompt)}")
             response = await self.llm.ainvoke(messages, config={"callbacks": [self._create_callback()]})
+            logger.debug(f"OpenAI response: length={len(response.content)}")
             return response.content
         except Exception as e:
             logger.error(f"OpenAI generation failed: {e}")
@@ -117,8 +120,10 @@ class OpenAILLM(BaseLLM):
         messages.append(HumanMessage(content=prompt))
 
         try:
+            logger.debug(f"OpenAI structured request: model={self.model}, prompt_length={len(prompt)}")
             structured_llm = self.llm.with_structured_output(schema)
             response = await structured_llm.ainvoke(messages, config={"callbacks": [self._create_callback()]})
+            logger.debug(f"OpenAI structured response received")
             return response
         except Exception as e:
             logger.error(f"OpenAI structured generation failed: {e}")
@@ -146,7 +151,9 @@ class AnthropicLLM(BaseLLM):
         messages.append(HumanMessage(content=prompt))
 
         try:
+            logger.debug(f"Anthropic request: model={self.model}, prompt_length={len(prompt)}")
             response = await self.llm.ainvoke(messages, config={"callbacks": [self._create_callback()]})
+            logger.debug(f"Anthropic response: length={len(response.content)}")
             return response.content
         except Exception as e:
             logger.error(f"Anthropic generation failed: {e}")
@@ -162,8 +169,10 @@ class AnthropicLLM(BaseLLM):
         messages.append(HumanMessage(content=prompt))
 
         try:
+            logger.debug(f"Anthropic structured request: model={self.model}, prompt_length={len(prompt)}")
             structured_llm = self.llm.with_structured_output(schema)
             response = await structured_llm.ainvoke(messages, config={"callbacks": [self._create_callback()]})
+            logger.debug(f"Anthropic structured response received")
             return response
         except Exception as e:
             logger.error(f"Anthropic structured generation failed: {e}")
@@ -174,6 +183,7 @@ class LLMFactory:
     """Factory for creating LLM instances."""
 
     _instances: Dict[str, BaseLLM] = {}
+    _lock = threading.Lock()
 
     @classmethod
     def create(cls, provider: Optional[str] = None, **kwargs) -> BaseLLM:
@@ -183,15 +193,17 @@ class LLMFactory:
 
         # Check if instance already exists
         cache_key = f"{provider}_{kwargs.get('model', config.default_model)}"
-        if cache_key in cls._instances:
-            return cls._instances[cache_key]
 
-        # Get LLM configuration
+        with cls._lock:
+            if cache_key in cls._instances:
+                return cls._instances[cache_key]
+
+        # Get LLM configuration (outside lock to avoid holding lock during config access)
         llm_config = config.get_llm_config(provider)
         llm_config.update(kwargs)
         llm_config["provider"] = provider
 
-        # Create instance based on provider
+        # Create instance based on provider (outside lock to avoid holding lock during initialization)
         instance: BaseLLM
         if provider == "openai":
             instance = OpenAILLM(llm_config)
@@ -200,14 +212,20 @@ class LLMFactory:
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
-        # Cache instance
-        cls._instances[cache_key] = instance
-        logger.info(f"Created {provider} LLM instance with model {llm_config.get('model')}")
+        # Cache instance with lock
+        with cls._lock:
+            # Double-check in case another thread created it while we were creating ours
+            if cache_key not in cls._instances:
+                cls._instances[cache_key] = instance
+                logger.info(f"Created {provider} LLM instance with model {llm_config.get('model')}")
+            else:
+                instance = cls._instances[cache_key]
 
         return instance
 
     @classmethod
     def clear_cache(cls):
         """Clear cached LLM instances."""
-        cls._instances.clear()
-        logger.info("Cleared LLM instance cache")
+        with cls._lock:
+            cls._instances.clear()
+            logger.info("Cleared LLM instance cache")
