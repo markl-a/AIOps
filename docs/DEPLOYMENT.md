@@ -289,19 +289,52 @@ alembic upgrade head
 
 所有配置通過環境變量管理：
 
+#### 必需變量 (Required)
+
+| 變量名 | 描述 | 要求 |
+|--------|------|------|
+| `JWT_SECRET_KEY` | JWT 簽名密鑰 | **必須至少 32 字符** |
+| `ADMIN_PASSWORD` | 管理員密碼 | **必須設置** |
+| `DATABASE_URL` | PostgreSQL 連接字符串 | 必須設置 |
+| `OPENAI_API_KEY` | OpenAI API 密鑰 | 至少需要一個 LLM 密鑰 |
+| `ANTHROPIC_API_KEY` | Anthropic API 密鑰 | 至少需要一個 LLM 密鑰 |
+
+> ⚠️ **安全警告**: `JWT_SECRET_KEY` 和 `ADMIN_PASSWORD` 在生產環境中必須設置，否則應用將無法啟動。
+
+生成安全的 JWT 密鑰：
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+#### 可選變量 (Optional)
+
 | 變量名 | 描述 | 默認值 |
 |--------|------|--------|
-| `DATABASE_URL` | PostgreSQL 連接字符串 | - |
-| `REDIS_URL` | Redis 連接字符串 | - |
-| `OPENAI_API_KEY` | OpenAI API 密鑰 | - |
-| `ANTHROPIC_API_KEY` | Anthropic API 密鑰 | - |
+| `ENVIRONMENT` | 運行環境 | `development` |
+| `REDIS_URL` | Redis 連接字符串 | `redis://localhost:6379/0` |
 | `DEFAULT_LLM_PROVIDER` | 默認 LLM 提供商 | `openai` |
 | `DEFAULT_MODEL` | 默認模型 | `gpt-4-turbo-preview` |
 | `LOG_LEVEL` | 日誌級別 | `INFO` |
 | `ENABLE_AUTH` | 啟用認證 | `true` |
-| `JWT_SECRET_KEY` | JWT 密鑰 | - |
 | `ENABLE_METRICS` | 啟用監控 | `true` |
 | `OTLP_ENDPOINT` | OpenTelemetry 端點 | - |
+
+#### 數據庫連接池配置
+
+| 變量名 | 描述 | 開發默認值 | 生產默認值 |
+|--------|------|-----------|-----------|
+| `DB_POOL_SIZE` | 連接池大小 | `5` | `20` |
+| `DB_MAX_OVERFLOW` | 最大溢出連接數 | `10` | `40` |
+| `DB_POOL_TIMEOUT` | 連接超時（秒） | `30` | `30` |
+| `DB_POOL_RECYCLE` | 連接回收時間（秒） | `3600` | `3600` |
+
+#### 生產環境特性
+
+當 `ENVIRONMENT=production` 時，以下特性會自動啟用：
+
+- **API 文檔禁用**: `/docs`、`/redoc`、`/openapi.json` 端點將不可用
+- **增強連接池**: 數據庫連接池自動調整為生產規格
+- **嚴格驗證**: Webhook 必須提供有效簽名
 
 ### ConfigMap 配置
 

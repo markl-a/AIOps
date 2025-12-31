@@ -19,6 +19,7 @@ from aiops.api.routes import (
     notifications,
     analytics,
     webhooks,
+    system,
 )
 from aiops.core.exceptions import AIOpsException
 from aiops.core.structured_logger import get_structured_logger
@@ -174,6 +175,7 @@ app.include_router(llm.router, prefix="/api/v1/llm", tags=["LLM"])
 app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(webhooks.router, prefix="/api/v1", tags=["Webhooks"])
+app.include_router(system.router, prefix="/api/v1/system", tags=["System"])
 
 
 @app.get("/", tags=["Root"])

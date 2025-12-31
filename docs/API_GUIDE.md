@@ -58,14 +58,216 @@ Rate limit headers are included in responses:
 
 #### GET /health
 
-Check API health status.
+Basic health check endpoint.
 
 **Response:**
 ```json
 {
   "status": "healthy",
   "version": "1.0.0",
-  "timestamp": "2024-01-15T10:00:00Z"
+  "timestamp": "2024-01-15T10:00:00Z",
+  "uptime_seconds": 3600.5
+}
+```
+
+#### GET /health/liveness
+
+Kubernetes liveness probe.
+
+**Response:**
+```json
+{
+  "status": "alive"
+}
+```
+
+#### GET /health/readiness
+
+Kubernetes readiness probe.
+
+**Response:**
+```json
+{
+  "status": "ready"
+}
+```
+
+#### GET /health/detailed
+
+Detailed health check with service status and system metrics.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-15T10:00:00Z",
+  "version": "1.0.0",
+  "services": {
+    "database": {
+      "status": "healthy",
+      "latency_ms": 2.5,
+      "message": "Database connection successful"
+    },
+    "cache": {
+      "status": "healthy",
+      "latency_ms": 1.2,
+      "message": "Redis connection successful"
+    },
+    "llm_providers": {
+      "status": "healthy",
+      "latency_ms": 50.3,
+      "message": "LLM provider available"
+    }
+  },
+  "system": {
+    "cpu_percent": 15.5,
+    "memory": {
+      "total_gb": 16.0,
+      "available_gb": 8.5,
+      "percent": 47.0
+    },
+    "disk": {
+      "total_gb": 500.0,
+      "free_gb": 250.0,
+      "percent": 50.0
+    },
+    "uptime_seconds": 3600.5
+  }
+}
+```
+
+#### GET /health/agents
+
+Check registered agents status.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "total_registered": 16,
+  "loaded": 3,
+  "cached_instances": 2,
+  "categories": ["code_quality", "monitoring", "infrastructure", "security", "automation"],
+  "agents": [
+    {
+      "name": "code_reviewer",
+      "category": "code_quality",
+      "description": "Reviews code for quality, security, and best practices",
+      "is_loaded": true
+    }
+  ]
+}
+```
+
+### System
+
+> **Note:** System endpoints require authentication.
+
+#### GET /api/v1/system/info
+
+Get basic system information. Requires `readonly` role or higher.
+
+**Response:**
+```json
+{
+  "version": "0.1.0",
+  "python_version": "3.11.0",
+  "platform": "Linux-5.15.0-x86_64",
+  "environment": "production",
+  "debug_mode": false,
+  "start_time": "2024-01-15T08:00:00Z"
+}
+```
+
+#### GET /api/v1/system/config
+
+Get non-sensitive configuration view. Requires `readonly` role or higher.
+
+**Response:**
+```json
+{
+  "default_llm_provider": "openai",
+  "default_model": "gpt-4-turbo-preview",
+  "log_level": "INFO",
+  "metrics_enabled": true,
+  "cors_origins": ["http://localhost:3000"],
+  "feature_flags": {
+    "code_review": true,
+    "test_generation": true,
+    "log_analysis": true,
+    "anomaly_detection": true,
+    "auto_fix": false
+  }
+}
+```
+
+#### GET /api/v1/system/stats
+
+Get runtime statistics. Requires `readonly` role or higher.
+
+**Response:**
+```json
+{
+  "uptime": {
+    "seconds": 86400.5,
+    "human": "1d 0h 0m 0s"
+  },
+  "process": {
+    "pid": 12345,
+    "memory_mb": 256.5,
+    "cpu_percent": 5.2,
+    "threads": 8
+  },
+  "agents": {
+    "registered": 16,
+    "loaded": 5,
+    "cached_instances": 3
+  },
+  "cache": {
+    "hits": 1500,
+    "misses": 300,
+    "size": 100
+  },
+  "tokens": {
+    "total_requests": 5000
+  }
+}
+```
+
+#### GET /api/v1/system/env
+
+Get environment variable status. Requires `admin` role.
+
+**Response:**
+```json
+{
+  "required": {
+    "JWT_SECRET_KEY": true,
+    "ADMIN_PASSWORD": true,
+    "OPENAI_API_KEY": true,
+    "ANTHROPIC_API_KEY": false,
+    "DATABASE_URL": true,
+    "REDIS_URL": true
+  },
+  "optional": {
+    "ENVIRONMENT": true,
+    "LOG_LEVEL": true,
+    "ENABLE_METRICS": true,
+    "SLACK_WEBHOOK_URL": false
+  },
+  "environment": "production"
+}
+```
+
+#### POST /api/v1/system/cache/clear
+
+Clear all caches. Requires `admin` role.
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "All caches cleared"
 }
 ```
 
