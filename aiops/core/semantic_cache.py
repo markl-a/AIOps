@@ -1,5 +1,6 @@
 """Semantic caching for LLM requests to reduce redundant API calls."""
 
+import asyncio
 import hashlib
 import json
 import time
@@ -14,6 +15,38 @@ from aiops.core.logger import get_logger
 from aiops.core.cache import Cache, get_cache
 
 logger = get_logger(__name__)
+
+
+class AsyncLockWrapper:
+    """
+    Wrapper that provides both sync and async lock capabilities.
+
+    For sync usage: Use as a regular context manager
+    For async usage: Use with async_lock() method
+    """
+
+    def __init__(self):
+        self._sync_lock = threading.Lock()
+        self._async_lock: Optional[asyncio.Lock] = None
+
+    def __enter__(self):
+        self._sync_lock.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._sync_lock.release()
+        return False
+
+    async def async_lock(self):
+        """Get async lock - creates one per event loop if needed."""
+        if self._async_lock is None:
+            try:
+                # Create async lock in current event loop
+                self._async_lock = asyncio.Lock()
+            except RuntimeError:
+                # No event loop running, use sync lock
+                return self
+        return self._async_lock
 
 
 @dataclass
@@ -89,7 +122,8 @@ class SemanticCache:
             "expirations": 0,
         }
 
-        self._lock = threading.Lock()
+        # Use lock wrapper for both sync and async support
+        self._lock = AsyncLockWrapper()
 
         logger.info(
             f"Semantic cache initialized: threshold={similarity_threshold}, "
@@ -325,6 +359,123 @@ class SemanticCache:
                 "evictions": self._stats["evictions"],
                 "expirations": self._stats["expirations"],
             }
+
+    async def aget(
+        self,
+        prompt: str,
+        model: str = "",
+        use_semantic: bool = True,
+        **kwargs,
+    ) -> Optional[Any]:
+        """
+        Async version of get() - preferred for async contexts.
+
+        This method uses an async lock to avoid blocking the event loop.
+        """
+        lock = await self._lock.async_lock()
+        async with lock:
+            # Run the actual get logic in thread pool for heavy operations
+            return await asyncio.to_thread(
+                self._get_sync,
+                prompt,
+                model,
+                use_semantic,
+                **kwargs,
+            )
+
+    def _get_sync(
+        self,
+        prompt: str,
+        model: str = "",
+        use_semantic: bool = True,
+        **kwargs,
+    ) -> Optional[Any]:
+        """Internal sync get logic."""
+        # Clean up expired entries periodically
+        if len(self._cache) > 0 and time.time() % 60 < 1:
+            self._cleanup_expired()
+
+        # Try exact match first
+        key = self._generate_key(prompt, model, **kwargs)
+        entry = self._cache.get(key)
+
+        if entry and time.time() - entry.created_at <= self.ttl:
+            # Move to end for LRU
+            self._cache.move_to_end(key)
+            entry.access_count += 1
+            entry.last_accessed = time.time()
+            self._stats["exact_hits"] += 1
+            logger.debug(f"Exact cache hit for key: {key[:16]}...")
+            return entry.value
+
+        # Try semantic match if enabled
+        if use_semantic and self.enable_semantic:
+            normalized = self._normalize_prompt(prompt)
+            match = self._find_semantic_match(normalized)
+
+            if match:
+                match.access_count += 1
+                match.last_accessed = time.time()
+                self._cache.move_to_end(match.key)
+                self._stats["semantic_hits"] += 1
+                return match.value
+
+        self._stats["misses"] += 1
+        return None
+
+    async def aset(
+        self,
+        prompt: str,
+        value: Any,
+        model: str = "",
+        metadata: Optional[Dict] = None,
+        **kwargs,
+    ):
+        """
+        Async version of set() - preferred for async contexts.
+
+        This method uses an async lock to avoid blocking the event loop.
+        """
+        lock = await self._lock.async_lock()
+        async with lock:
+            await asyncio.to_thread(
+                self._set_sync,
+                prompt,
+                value,
+                model,
+                metadata,
+                **kwargs,
+            )
+
+    def _set_sync(
+        self,
+        prompt: str,
+        value: Any,
+        model: str = "",
+        metadata: Optional[Dict] = None,
+        **kwargs,
+    ):
+        """Internal sync set logic."""
+        self._evict_if_needed()
+
+        key = self._generate_key(prompt, model, **kwargs)
+        normalized = self._normalize_prompt(prompt)
+
+        entry = SemanticCacheEntry(
+            key=key,
+            prompt_hash=hashlib.sha256(prompt.encode()).hexdigest(),
+            prompt_normalized=normalized,
+            value=value,
+            created_at=time.time(),
+            last_accessed=time.time(),
+            similarity_threshold=self.similarity_threshold,
+            metadata=metadata,
+        )
+
+        self._cache[key] = entry
+        self._prompt_index[normalized] = key
+
+        logger.debug(f"Cached value for key: {key[:16]}...")
 
 
 # Global semantic cache instance

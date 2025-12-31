@@ -19,7 +19,31 @@ from aiops.core.logger import get_logger
 logger = get_logger(__name__)
 
 # Configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
+def _get_jwt_secret() -> str:
+    """Get JWT secret key from environment. Fails if not configured."""
+    secret = os.getenv("JWT_SECRET_KEY")
+    if not secret:
+        raise RuntimeError(
+            "JWT_SECRET_KEY environment variable is required. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+        )
+    if len(secret) < 32:
+        raise RuntimeError("JWT_SECRET_KEY must be at least 32 characters long")
+    return secret
+
+
+# Lazy-loaded secret key (validated on first use)
+_SECRET_KEY: Optional[str] = None
+
+
+def get_secret_key() -> str:
+    """Get the JWT secret key, validating on first access."""
+    global _SECRET_KEY
+    if _SECRET_KEY is None:
+        _SECRET_KEY = _get_jwt_secret()
+    return _SECRET_KEY
+
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 API_KEYS_FILE = Path(os.getenv("API_KEYS_FILE", ".aiops_api_keys.json"))
@@ -198,7 +222,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
     to_encode.update({"exp": expire})
 
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, get_secret_key(), algorithm=ALGORITHM)
     return encoded_jwt
 
 
@@ -216,7 +240,7 @@ def decode_access_token(token: str) -> TokenData:
         HTTPException: If token is invalid
     """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, get_secret_key(), algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         role: str = payload.get("role", UserRole.USER)
         exp: float = payload.get("exp")

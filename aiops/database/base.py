@@ -56,14 +56,39 @@ class DatabaseManager:
             **kwargs: Additional engine arguments
         """
         try:
-            # Default engine arguments
+            # Get environment-based pool size
+            import os
+            env = os.getenv("ENVIRONMENT", "development").lower()
+            is_production = env in ("production", "prod")
+
+            # Optimized pool settings based on environment
+            # Production: Larger pool for high concurrency
+            # Development: Smaller pool for resource efficiency
+            default_pool_size = 20 if is_production else 5
+            default_max_overflow = 40 if is_production else 10
+
+            # Default engine arguments with optimized settings
             engine_args = {
                 "pool_pre_ping": True,  # Verify connections before using
-                "pool_size": 10,
-                "max_overflow": 20,
-                "pool_recycle": 3600,  # Recycle connections after 1 hour
-                "echo": False,
+                "pool_size": int(os.getenv("DB_POOL_SIZE", default_pool_size)),
+                "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", default_max_overflow)),
+                "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", 3600)),  # Recycle after 1 hour
+                "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", 30)),  # Wait up to 30s for connection
+                "echo": os.getenv("DB_ECHO", "false").lower() == "true",
+                # Connection arguments for better reliability
+                "connect_args": {
+                    "connect_timeout": 10,  # Connection timeout in seconds
+                    "application_name": "aiops",  # Identify in pg_stat_activity
+                },
             }
+
+            # Log pool configuration
+            logger.info(
+                f"Database pool config: size={engine_args['pool_size']}, "
+                f"overflow={engine_args['max_overflow']}, "
+                f"timeout={engine_args['pool_timeout']}s, "
+                f"recycle={engine_args['pool_recycle']}s"
+            )
 
             # Update with custom arguments
             engine_args.update(kwargs)

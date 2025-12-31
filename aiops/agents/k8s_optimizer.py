@@ -9,10 +9,16 @@ from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, Field
 import yaml
 import json
+import asyncio
 from datetime import datetime
 from aiops.core.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+async def _run_sync(func, *args, **kwargs):
+    """Run a synchronous function in a thread pool to avoid blocking."""
+    return await asyncio.to_thread(func, *args, **kwargs)
 
 
 class ResourceRecommendation(BaseModel):
@@ -72,44 +78,63 @@ class KubernetesOptimizerAgent:
             K8sOptimizationResult with recommendations
         """
         try:
-            # Parse YAML
-            deployment = yaml.safe_load(deployment_yaml)
+            # Parse YAML in thread pool to avoid blocking
+            deployment = await _run_sync(yaml.safe_load, deployment_yaml)
 
             recommendations = []
             issues = []
 
-            # Analyze resource requests and limits
-            resource_rec = self._analyze_resources(deployment, metrics)
+            # Run CPU-intensive analysis in parallel using thread pool
+            analysis_tasks = [
+                _run_sync(self._analyze_resources, deployment, metrics),
+                _run_sync(self._check_autoscaling, deployment),
+                _run_sync(self._analyze_replicas, deployment, metrics),
+                _run_sync(self._check_resource_quotas, deployment),
+                _run_sync(self._check_best_practices, deployment),
+            ]
+
+            results = await asyncio.gather(*analysis_tasks, return_exceptions=True)
+
+            # Process results
+            resource_rec, hpa_rec, replica_rec, quota_issues, bp_issues = results
+
+            # Handle potential exceptions in results
+            if isinstance(resource_rec, Exception):
+                logger.warning(f"Resource analysis failed: {resource_rec}")
+                resource_rec = []
+            if isinstance(hpa_rec, Exception):
+                logger.warning(f"HPA check failed: {hpa_rec}")
+                hpa_rec = None
+            if isinstance(replica_rec, Exception):
+                logger.warning(f"Replica analysis failed: {replica_rec}")
+                replica_rec = None
+            if isinstance(quota_issues, Exception):
+                logger.warning(f"Quota check failed: {quota_issues}")
+                quota_issues = []
+            if isinstance(bp_issues, Exception):
+                logger.warning(f"Best practices check failed: {bp_issues}")
+                bp_issues = []
+
+            # Collect recommendations
             if resource_rec:
                 recommendations.extend(resource_rec)
-
-            # Check for autoscaling
-            hpa_rec = self._check_autoscaling(deployment)
             if hpa_rec:
                 recommendations.append(hpa_rec)
                 issues.append("Missing HorizontalPodAutoscaler configuration")
-
-            # Analyze replica count
-            replica_rec = self._analyze_replicas(deployment, metrics)
             if replica_rec:
                 recommendations.append(replica_rec)
 
-            # Check resource quotas and limits
-            quota_issues = self._check_resource_quotas(deployment)
             issues.extend(quota_issues)
-
-            # Check for best practices
-            bp_issues = self._check_best_practices(deployment)
             issues.extend(bp_issues)
 
             # Calculate cluster efficiency
-            efficiency = self._calculate_efficiency(deployment, metrics)
+            efficiency = await _run_sync(self._calculate_efficiency, deployment, metrics)
 
             # Calculate potential savings
-            savings = self._calculate_savings(recommendations)
+            savings = await _run_sync(self._calculate_savings, recommendations)
 
             # Generate summary
-            summary = self._generate_summary(deployment, recommendations, efficiency)
+            summary = await _run_sync(self._generate_summary, deployment, recommendations, efficiency)
 
             result = K8sOptimizationResult(
                 cluster_name=deployment.get('metadata', {}).get('namespace', 'default'),

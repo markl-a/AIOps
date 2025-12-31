@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Callable
 import hmac
 import hashlib
+import os
 from pydantic import BaseModel, Field
 from datetime import datetime
 from aiops.core.logger import get_logger
@@ -199,6 +200,7 @@ class WebhookProcessor:
         headers: Dict[str, str],
         payload: bytes,
         signature: Optional[str] = None,
+        require_signature: bool = True,
     ) -> Dict[str, Any]:
         """
         Process incoming webhook.
@@ -208,6 +210,7 @@ class WebhookProcessor:
             headers: HTTP headers
             payload: Raw webhook payload
             signature: Webhook signature for verification
+            require_signature: Whether to require signature verification (default: True)
 
         Returns:
             Processing result
@@ -222,13 +225,32 @@ class WebhookProcessor:
 
         handler = self.handlers[source]
 
-        # Verify signature
-        if signature and not handler.verify_signature(payload, signature):
-            logger.error(f"Invalid webhook signature for {source}")
-            return {
-                "status": "error",
-                "error": "Invalid signature",
-            }
+        # SECURITY: Always verify signature when handler has a secret configured
+        if handler.secret:
+            if not signature:
+                logger.error(f"Missing webhook signature for {source} - signature required")
+                return {
+                    "status": "error",
+                    "error": "Missing signature - webhook signature verification is required",
+                }
+            if not handler.verify_signature(payload, signature):
+                logger.error(f"Invalid webhook signature for {source}")
+                return {
+                    "status": "error",
+                    "error": "Invalid signature",
+                }
+        elif require_signature:
+            # Handler has no secret but signature is required
+            logger.warning(
+                f"Webhook handler for {source} has no secret configured. "
+                "Configure a webhook secret for security."
+            )
+            # In strict mode, reject requests without configured secrets
+            if os.environ.get("WEBHOOK_STRICT_MODE", "false").lower() == "true":
+                return {
+                    "status": "error",
+                    "error": "Webhook secret not configured - enable WEBHOOK_STRICT_MODE=false to allow unsigned webhooks",
+                }
 
         # Parse payload
         try:

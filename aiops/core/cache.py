@@ -1,14 +1,18 @@
 """Caching system for AIOps framework with Redis and file-based backends."""
 
+import asyncio
 import hashlib
 import json
 import time
 import pickle
 import os
-from typing import Any, Optional, Callable
+from typing import Any, Optional, Callable, Dict, List, TypeVar
 from pathlib import Path
 from functools import wraps
 from aiops.core.logger import get_logger
+
+# Type variable for generic return types
+T = TypeVar('T')
 
 logger = get_logger(__name__)
 
@@ -349,7 +353,7 @@ class RateLimiter:
         """
         self.max_calls = max_calls
         self.time_window = time_window
-        self.calls = []
+        self.calls: List[float] = []
 
     def is_allowed(self) -> bool:
         """Check if a new call is allowed."""
@@ -373,7 +377,7 @@ class RateLimiter:
         oldest_call = min(self.calls)
         return max(0.0, self.time_window - (time.time() - oldest_call))
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> Dict[str, Any]:
         """Get rate limiter statistics."""
         now = time.time()
         active_calls = len([c for c in self.calls if now - c < self.time_window])
@@ -416,6 +420,3 @@ def rate_limited(max_calls: int = 60, time_window: int = 60):
         return wrapper
 
     return decorator
-
-
-import asyncio

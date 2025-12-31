@@ -37,16 +37,42 @@ class Config(BaseSettings):
     discord_webhook_url: Optional[str] = None
 
     # CORS Settings
+    # SECURITY: Use explicit values instead of wildcards
     cors_origins: str = "http://localhost:3000,http://localhost:8080"
     cors_allow_credentials: bool = True
-    cors_allow_methods: str = "*"
-    cors_allow_headers: str = "*"
+    cors_allow_methods: str = "GET,POST,PUT,DELETE,OPTIONS,PATCH"
+    cors_allow_headers: str = "Content-Type,Authorization,X-API-Key,X-Request-ID,Accept,Origin"
 
     def get_cors_origins(self) -> list:
         """Get CORS origins as a list."""
+        import logging
         if self.cors_origins == "*":
+            logging.getLogger(__name__).warning(
+                "SECURITY WARNING: CORS origins set to '*' - this allows all origins. "
+                "Consider restricting to specific domains in production."
+            )
             return ["*"]
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    def get_cors_methods(self) -> list:
+        """Get CORS methods as a list."""
+        import logging
+        if self.cors_allow_methods == "*":
+            logging.getLogger(__name__).warning(
+                "SECURITY WARNING: CORS methods set to '*' - consider using explicit methods."
+            )
+            return ["*"]
+        return [method.strip() for method in self.cors_allow_methods.split(",") if method.strip()]
+
+    def get_cors_headers(self) -> list:
+        """Get CORS headers as a list."""
+        import logging
+        if self.cors_allow_headers == "*":
+            logging.getLogger(__name__).warning(
+                "SECURITY WARNING: CORS headers set to '*' - consider using explicit headers."
+            )
+            return ["*"]
+        return [header.strip() for header in self.cors_allow_headers.split(",") if header.strip()]
 
     # Feature Flags
     enable_code_review: bool = True
