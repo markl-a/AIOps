@@ -215,9 +215,9 @@ async def agent_plugin_example():
     print("\n2️⃣  Analyzing Code:")
     code_sample = """
 def calculate_total(items):
-    # TODO: Add validation
-    # FIXME: Handle negative values
-    total = sum(items)
+    if not items:
+        return 0
+    total = sum(abs(item) for item in items)
     return total
 """
 

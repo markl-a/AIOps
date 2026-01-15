@@ -67,7 +67,7 @@ tenacity~=8.2                    # Retry library with exponential backoff
 
 # System & Process Utilities
 # ------------------------------------------------------------------------------
-psutil~=5.9                      # System and process monitoring
+psutil~=6.0                      # System and process monitoring
 
 # Database & ORM
 # ------------------------------------------------------------------------------

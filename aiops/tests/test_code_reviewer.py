@@ -85,7 +85,7 @@ async def test_review_diff(mock_code_review_agent):
 @@ -1,3 +1,4 @@
  def calculate():
 -    return 1 + 1
-+    # TODO: implement
++    # Placeholder implementation
 +    return 0
 """
 

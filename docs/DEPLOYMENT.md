@@ -1,56 +1,56 @@
-# AIOps 部署指南
+# AIOps Deployment Guide
 
-本文檔提供 AIOps 專案的完整部署指南，包括本地開發、測試環境和生產環境的部署步驟。
+This document provides a complete deployment guide for the AIOps project, including deployment steps for local development, testing environments, and production environments.
 
-## 目錄
+## Table of Contents
 
-- [環境要求](#環境要求)
-- [本地開發部署](#本地開發部署)
-- [Docker 部署](#docker-部署)
-- [Kubernetes 生產部署](#kubernetes-生產部署)
-- [配置管理](#配置管理)
-- [監控和日誌](#監控和日誌)
-- [備份和災難恢復](#備份和災難恢復)
+- [Requirements](#requirements)
+- [Local Development Deployment](#local-development-deployment)
+- [Docker Deployment](#docker-deployment)
+- [Kubernetes Production Deployment](#kubernetes-production-deployment)
+- [Configuration Management](#configuration-management)
+- [Monitoring and Logging](#monitoring-and-logging)
+- [Backup and Disaster Recovery](#backup-and-disaster-recovery)
 
 ---
 
-## 環境要求
+## Requirements
 
-### 最低要求
+### Minimum Requirements
 - **Python**: 3.9+
 - **PostgreSQL**: 13+
 - **Redis**: 6.0+
-- **CPU**: 2核
-- **記憶體**: 4GB
-- **儲存**: 20GB
+- **CPU**: 2 cores
+- **Memory**: 4GB
+- **Storage**: 20GB
 
-### 生產環境建議
+### Production Environment Recommendations
 - **Python**: 3.11
-- **PostgreSQL**: 15+ (含 pgvector 擴展)
+- **PostgreSQL**: 15+ (with pgvector extension)
 - **Redis**: 7.0+
-- **CPU**: 4核+
-- **記憶體**: 16GB+
-- **儲存**: 100GB+ SSD
+- **CPU**: 4+ cores
+- **Memory**: 16GB+
+- **Storage**: 100GB+ SSD
 
-### 依賴服務
-- **LLM API**: OpenAI 或 Anthropic API 密鑰
-- **Kubernetes**: 1.24+ (生產環境)
-- **Jaeger**: 分佈式追蹤 (可選)
-- **Prometheus**: 指標監控 (可選)
-- **Grafana**: 可視化 (可選)
+### Dependency Services
+- **LLM API**: OpenAI or Anthropic API key
+- **Kubernetes**: 1.24+ (production environment)
+- **Jaeger**: Distributed tracing (optional)
+- **Prometheus**: Metrics monitoring (optional)
+- **Grafana**: Visualization (optional)
 
 ---
 
-## 本地開發部署
+## Local Development Deployment
 
-### 1. 克隆專案
+### 1. Clone the Project
 
 ```bash
 git clone https://github.com/markl-a/AIOps.git
 cd AIOps
 ```
 
-### 2. 創建虛擬環境
+### 2. Create Virtual Environment
 
 ```bash
 python -m venv venv
@@ -58,128 +58,128 @@ source venv/bin/activate  # Linux/Mac
 # venv\Scripts\activate  # Windows
 ```
 
-### 3. 安裝依賴
+### 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. 配置環境變量
+### 4. Configure Environment Variables
 
 ```bash
 cp .env.example .env
 ```
 
-編輯 `.env` 文件：
+Edit the `.env` file:
 
 ```env
-# LLM 配置
+# LLM Configuration
 OPENAI_API_KEY=your_openai_api_key
 ANTHROPIC_API_KEY=your_anthropic_api_key
 DEFAULT_LLM_PROVIDER=openai
 DEFAULT_MODEL=gpt-4-turbo-preview
 
-# 數據庫配置
+# Database Configuration
 DATABASE_URL=postgresql://aiops:aiops@localhost:5432/aiops
 
-# Redis 配置
+# Redis Configuration
 REDIS_URL=redis://localhost:6379/0
 
-# API 安全
+# API Security
 ENABLE_AUTH=true
 JWT_SECRET_KEY=your_secret_key_here
 ADMIN_PASSWORD=your_admin_password
 
-# 日誌配置
+# Logging Configuration
 LOG_LEVEL=INFO
 ENABLE_METRICS=true
 ```
 
-### 5. 啟動服務
+### 5. Start Services
 
-#### 方式 A: 使用 Docker Compose (推薦)
+#### Option A: Using Docker Compose (Recommended)
 
 ```bash
 docker-compose up -d
 ```
 
-這會啟動：
+This will start:
 - PostgreSQL
 - Redis
 - AIOps API
 - AIOps Worker
 - AIOps Beat
-- Prometheus (可選)
+- Prometheus (optional)
 
-#### 方式 B: 手動啟動
+#### Option B: Manual Start
 
-**啟動 PostgreSQL 和 Redis** (假設已安裝)
+**Start PostgreSQL and Redis** (assuming already installed)
 
 ```bash
-# 創建數據庫
+# Create database
 createdb aiops
 
-# 運行遷移
+# Run migrations
 alembic upgrade head
 ```
 
-**啟動 API 服務器**
+**Start API Server**
 
 ```bash
 uvicorn aiops.api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**啟動 Celery Worker**
+**Start Celery Worker**
 
 ```bash
 celery -A aiops.tasks.celery_app worker --loglevel=info
 ```
 
-**啟動 Celery Beat**
+**Start Celery Beat**
 
 ```bash
 celery -A aiops.tasks.celery_app beat --loglevel=info
 ```
 
-### 6. 驗證部署
+### 6. Verify Deployment
 
-訪問 http://localhost:8000/docs 查看 API 文檔
+Visit http://localhost:8000/docs to view API documentation
 
 ```bash
-# 健康檢查
+# Health check
 curl http://localhost:8000/health
 
-# 獲取 Token
+# Get Token
 curl -X POST http://localhost:8000/api/v1/auth/token \
   -d "username=admin&password=admin"
 ```
 
 ---
 
-## Docker 部署
+## Docker Deployment
 
-### 1. 構建鏡像
+### 1. Build Image
 
 ```bash
 docker build -t aiops:latest .
 ```
 
-### 2. 使用 Docker Compose
+### 2. Using Docker Compose
 
 ```bash
-# 啟動所有服務
+# Start all services
 docker-compose up -d
 
-# 查看日誌
+# View logs
 docker-compose logs -f
 
-# 停止服務
+# Stop services
 docker-compose down
 ```
 
-### 3. 自定義配置
+### 3. Custom Configuration
 
-編輯 `docker-compose.yml`:
+Edit `docker-compose.yml`:
 
 ```yaml
 services:
@@ -191,24 +191,24 @@ services:
 
 ---
 
-## Kubernetes 生產部署
+## Kubernetes Production Deployment
 
-### 前置條件
+### Prerequisites
 
-- Kubernetes 集群 (1.24+)
-- kubectl 配置完成
-- Helm 3.0+ (可選)
+- Kubernetes cluster (1.24+)
+- kubectl configured
+- Helm 3.0+ (optional)
 
-### 1. 創建命名空間
+### 1. Create Namespace
 
 ```bash
 kubectl create namespace aiops
 ```
 
-### 2. 創建 Secrets
+### 2. Create Secrets
 
 ```bash
-# 創建 API 密鑰 Secret
+# Create API key Secret
 kubectl create secret generic aiops-secrets \
   --from-literal=database-url=postgresql://user:pass@postgres:5432/aiops \
   --from-literal=openai-api-key=your_openai_key \
@@ -216,10 +216,10 @@ kubectl create secret generic aiops-secrets \
   -n aiops
 ```
 
-### 3. 部署 PostgreSQL 和 Redis
+### 3. Deploy PostgreSQL and Redis
 
 ```bash
-# 使用 Helm 部署 PostgreSQL
+# Deploy PostgreSQL using Helm
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm install postgres bitnami/postgresql \
   --set auth.username=aiops \
@@ -227,26 +227,26 @@ helm install postgres bitnami/postgresql \
   --set auth.database=aiops \
   -n aiops
 
-# 部署 Redis
+# Deploy Redis
 helm install redis bitnami/redis \
   --set auth.enabled=false \
   -n aiops
 ```
 
-### 4. 部署 AIOps 應用
+### 4. Deploy AIOps Application
 
 ```bash
-# 應用 Kubernetes 配置
+# Apply Kubernetes configuration
 kubectl apply -f k8s/base/ -n aiops
 
-# 查看部署狀態
+# View deployment status
 kubectl get pods -n aiops
 kubectl get svc -n aiops
 ```
 
-### 5. 配置 Ingress
+### 5. Configure Ingress
 
-編輯 `k8s/base/ingress.yaml` 設置你的域名：
+Edit `k8s/base/ingress.yaml` to set your domain:
 
 ```yaml
 spec:
@@ -257,86 +257,86 @@ spec:
   - host: your-domain.com
 ```
 
-應用配置：
+Apply configuration:
 
 ```bash
 kubectl apply -f k8s/base/ingress.yaml -n aiops
 ```
 
-### 6. 配置自動擴展
+### 6. Configure Auto Scaling
 
-HPA 已包含在配置中，驗證：
+HPA is included in the configuration, verify:
 
 ```bash
 kubectl get hpa -n aiops
 ```
 
-### 7. 運行數據庫遷移
+### 7. Run Database Migrations
 
 ```bash
-# 進入 API Pod
+# Enter API Pod
 kubectl exec -it deployment/aiops-api -n aiops -- bash
 
-# 運行遷移
+# Run migrations
 alembic upgrade head
 ```
 
 ---
 
-## 配置管理
+## Configuration Management
 
-### 環境變量
+### Environment Variables
 
-所有配置通過環境變量管理：
+All configuration is managed through environment variables:
 
-#### 必需變量 (Required)
+#### Required Variables
 
-| 變量名 | 描述 | 要求 |
-|--------|------|------|
-| `JWT_SECRET_KEY` | JWT 簽名密鑰 | **必須至少 32 字符** |
-| `ADMIN_PASSWORD` | 管理員密碼 | **必須設置** |
-| `DATABASE_URL` | PostgreSQL 連接字符串 | 必須設置 |
-| `OPENAI_API_KEY` | OpenAI API 密鑰 | 至少需要一個 LLM 密鑰 |
-| `ANTHROPIC_API_KEY` | Anthropic API 密鑰 | 至少需要一個 LLM 密鑰 |
+| Variable Name | Description | Requirements |
+|---------------|-------------|--------------|
+| `JWT_SECRET_KEY` | JWT signing key | **Must be at least 32 characters** |
+| `ADMIN_PASSWORD` | Administrator password | **Must be set** |
+| `DATABASE_URL` | PostgreSQL connection string | Must be set |
+| `OPENAI_API_KEY` | OpenAI API key | At least one LLM key required |
+| `ANTHROPIC_API_KEY` | Anthropic API key | At least one LLM key required |
 
-> ⚠️ **安全警告**: `JWT_SECRET_KEY` 和 `ADMIN_PASSWORD` 在生產環境中必須設置，否則應用將無法啟動。
+> **Security Warning**: `JWT_SECRET_KEY` and `ADMIN_PASSWORD` must be set in production environments, otherwise the application will fail to start.
 
-生成安全的 JWT 密鑰：
+Generate a secure JWT key:
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-#### 可選變量 (Optional)
+#### Optional Variables
 
-| 變量名 | 描述 | 默認值 |
-|--------|------|--------|
-| `ENVIRONMENT` | 運行環境 | `development` |
-| `REDIS_URL` | Redis 連接字符串 | `redis://localhost:6379/0` |
-| `DEFAULT_LLM_PROVIDER` | 默認 LLM 提供商 | `openai` |
-| `DEFAULT_MODEL` | 默認模型 | `gpt-4-turbo-preview` |
-| `LOG_LEVEL` | 日誌級別 | `INFO` |
-| `ENABLE_AUTH` | 啟用認證 | `true` |
-| `ENABLE_METRICS` | 啟用監控 | `true` |
-| `OTLP_ENDPOINT` | OpenTelemetry 端點 | - |
+| Variable Name | Description | Default Value |
+|---------------|-------------|---------------|
+| `ENVIRONMENT` | Runtime environment | `development` |
+| `REDIS_URL` | Redis connection string | `redis://localhost:6379/0` |
+| `DEFAULT_LLM_PROVIDER` | Default LLM provider | `openai` |
+| `DEFAULT_MODEL` | Default model | `gpt-4-turbo-preview` |
+| `LOG_LEVEL` | Log level | `INFO` |
+| `ENABLE_AUTH` | Enable authentication | `true` |
+| `ENABLE_METRICS` | Enable monitoring | `true` |
+| `OTLP_ENDPOINT` | OpenTelemetry endpoint | - |
 
-#### 數據庫連接池配置
+#### Database Connection Pool Configuration
 
-| 變量名 | 描述 | 開發默認值 | 生產默認值 |
-|--------|------|-----------|-----------|
-| `DB_POOL_SIZE` | 連接池大小 | `5` | `20` |
-| `DB_MAX_OVERFLOW` | 最大溢出連接數 | `10` | `40` |
-| `DB_POOL_TIMEOUT` | 連接超時（秒） | `30` | `30` |
-| `DB_POOL_RECYCLE` | 連接回收時間（秒） | `3600` | `3600` |
+| Variable Name | Description | Development Default | Production Default |
+|---------------|-------------|---------------------|-------------------|
+| `DB_POOL_SIZE` | Connection pool size | `5` | `20` |
+| `DB_MAX_OVERFLOW` | Maximum overflow connections | `10` | `40` |
+| `DB_POOL_TIMEOUT` | Connection timeout (seconds) | `30` | `30` |
+| `DB_POOL_RECYCLE` | Connection recycle time (seconds) | `3600` | `3600` |
 
-#### 生產環境特性
+#### Production Environment Features
 
-當 `ENVIRONMENT=production` 時，以下特性會自動啟用：
+When `ENVIRONMENT=production`, the following features are automatically enabled:
 
-- **API 文檔禁用**: `/docs`、`/redoc`、`/openapi.json` 端點將不可用
-- **增強連接池**: 數據庫連接池自動調整為生產規格
-- **嚴格驗證**: Webhook 必須提供有效簽名
+- **API Documentation Disabled**: `/docs`, `/redoc`, `/openapi.json` endpoints will be unavailable
+- **Enhanced Connection Pool**: Database connection pool automatically adjusts to production specifications
+- **Strict Validation**: Webhooks must provide valid signatures
 
-### ConfigMap 配置
+### ConfigMap Configuration
 
 ```bash
 kubectl create configmap aiops-config \
@@ -347,76 +347,76 @@ kubectl create configmap aiops-config \
 
 ---
 
-## 監控和日誌
+## Monitoring and Logging
 
-### Prometheus 指標
+### Prometheus Metrics
 
-AIOps 暴露以下 Prometheus 指標：
+AIOps exposes the following Prometheus metrics:
 
-- `/metrics` - 應用指標端點
+- `/metrics` - Application metrics endpoint
 
-主要指標：
-- `aiops_http_requests_total` - HTTP 請求總數
-- `aiops_agent_executions_total` - 代理執行總數
-- `aiops_llm_requests_total` - LLM 請求總數
-- `aiops_llm_cost_total` - LLM 總成本
-- `aiops_errors_total` - 錯誤總數
+Key metrics:
+- `aiops_http_requests_total` - Total HTTP requests
+- `aiops_agent_executions_total` - Total agent executions
+- `aiops_llm_requests_total` - Total LLM requests
+- `aiops_llm_cost_total` - Total LLM cost
+- `aiops_errors_total` - Total errors
 
-### 部署 Prometheus
+### Deploy Prometheus
 
 ```bash
 kubectl apply -f monitoring/prometheus/
 ```
 
-### Grafana 儀表板
+### Grafana Dashboards
 
-1. 部署 Grafana:
+1. Deploy Grafana:
 ```bash
 helm install grafana bitnami/grafana -n aiops
 ```
 
-2. 導入儀表板:
-- 訪問 Grafana UI
-- 導入 `monitoring/grafana/dashboards/*.json`
+2. Import dashboards:
+- Access Grafana UI
+- Import `monitoring/grafana/dashboards/*.json`
 
-### 日誌聚合
+### Log Aggregation
 
-日誌以 JSON 格式輸出到 `logs/` 目錄。
+Logs are output in JSON format to the `logs/` directory.
 
-**使用 ELK/EFK Stack**:
+**Using ELK/EFK Stack**:
 
 ```bash
-# 安裝 Filebeat
+# Install Filebeat
 kubectl apply -f monitoring/logging/filebeat.yaml -n aiops
 ```
 
-**查看日誌**:
+**View Logs**:
 
 ```bash
-# 實時查看 API 日誌
+# Real-time API logs
 kubectl logs -f deployment/aiops-api -n aiops
 
-# 查看 Worker 日誌
+# View Worker logs
 kubectl logs -f deployment/aiops-worker -n aiops
 ```
 
 ---
 
-## 備份和災難恢復
+## Backup and Disaster Recovery
 
-### 數據庫備份
+### Database Backup
 
-**手動備份**:
+**Manual Backup**:
 
 ```bash
-# 備份數據庫
+# Backup database
 pg_dump -h localhost -U aiops aiops > backup_$(date +%Y%m%d_%H%M%S).sql
 
-# 恢復數據庫
+# Restore database
 psql -h localhost -U aiops aiops < backup_20240101_120000.sql
 ```
 
-**自動備份 (Kubernetes CronJob)**:
+**Automatic Backup (Kubernetes CronJob)**:
 
 ```yaml
 apiVersion: batch/v1
@@ -424,7 +424,7 @@ kind: CronJob
 metadata:
   name: postgres-backup
 spec:
-  schedule: "0 2 * * *"  # 每天凌晨 2 點
+  schedule: "0 2 * * *"  # Daily at 2 AM
   jobTemplate:
     spec:
       template:
@@ -438,65 +438,65 @@ spec:
             - pg_dump -h postgres -U aiops aiops | gzip > /backup/db_$(date +\%Y\%m\%d).sql.gz
 ```
 
-### 災難恢復計劃
+### Disaster Recovery Plan
 
-詳見 [DISASTER_RECOVERY.md](./DISASTER_RECOVERY.md)
+See [DISASTER_RECOVERY.md](./DISASTER_RECOVERY.md) for details
 
 ---
 
-## 故障排查
+## Troubleshooting
 
-### 常見問題
+### Common Issues
 
-**1. API 無法連接數據庫**
+**1. API Cannot Connect to Database**
 
 ```bash
-# 檢查數據庫連接
+# Check database connection
 kubectl exec deployment/aiops-api -n aiops -- \
   psql $DATABASE_URL -c "SELECT 1"
 ```
 
-**2. Worker 無法處理任務**
+**2. Worker Cannot Process Tasks**
 
 ```bash
-# 檢查 Redis 連接
+# Check Redis connection
 kubectl exec deployment/aiops-worker -n aiops -- \
   redis-cli -u $REDIS_URL ping
 ```
 
-**3. 高記憶體使用**
+**3. High Memory Usage**
 
 ```bash
-# 查看資源使用
+# View resource usage
 kubectl top pods -n aiops
 ```
 
-詳細故障排查請參考 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
+For detailed troubleshooting, refer to [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
 
 ---
 
-## 安全最佳實踐
+## Security Best Practices
 
-1. ✅ 使用強密碼和密鑰
-2. ✅ 啟用 TLS/SSL 加密
-3. ✅ 定期更新依賴
-4. ✅ 使用 Kubernetes Secrets 管理敏感數據
-5. ✅ 啟用 Pod Security Policies
-6. ✅ 定期備份數據
-7. ✅ 啟用審計日誌
-8. ✅ 限制 API 速率
+1. Use strong passwords and keys
+2. Enable TLS/SSL encryption
+3. Regularly update dependencies
+4. Use Kubernetes Secrets to manage sensitive data
+5. Enable Pod Security Policies
+6. Regularly backup data
+7. Enable audit logging
+8. Implement API rate limiting
 
 ---
 
-## 性能調優
+## Performance Tuning
 
-### API 服務器
+### API Server
 
 ```yaml
-# 增加 worker 數量
+# Increase worker count
 command: ["uvicorn", "aiops.api.main:app", "--workers", "4"]
 
-# 調整資源限制
+# Adjust resource limits
 resources:
   requests:
     memory: "1Gi"
@@ -506,19 +506,19 @@ resources:
     cpu: "2000m"
 ```
 
-### Worker 並發
+### Worker Concurrency
 
 ```yaml
-# Celery worker 並發設置
+# Celery worker concurrency settings
 args:
   - "--concurrency=8"
   - "--max-tasks-per-child=100"
 ```
 
-### 數據庫連接池
+### Database Connection Pool
 
 ```python
-# 調整連接池大小
+# Adjust connection pool size
 engine = create_engine(
     DATABASE_URL,
     pool_size=20,
@@ -528,24 +528,24 @@ engine = create_engine(
 
 ---
 
-## 擴展性考慮
+## Scalability Considerations
 
-- **水平擴展**: 使用 HPA 自動擴展 Pod
-- **垂直擴展**: 增加 Pod 資源限制
-- **數據庫**: 使用 PostgreSQL 讀寫分離
-- **緩存**: 使用 Redis Cluster
-- **負載均衡**: 使用 Ingress Controller
-
----
-
-## 相關文檔
-
-- [故障排查指南](./TROUBLESHOOTING.md)
-- [災難恢復計劃](./DISASTER_RECOVERY.md)
-- [最佳實踐](./BEST_PRACTICES.md)
-- [API 文檔](./API.md)
+- **Horizontal Scaling**: Use HPA for automatic Pod scaling
+- **Vertical Scaling**: Increase Pod resource limits
+- **Database**: Use PostgreSQL read replicas
+- **Caching**: Use Redis Cluster
+- **Load Balancing**: Use Ingress Controller
 
 ---
 
-**更新日期**: 2024-01-15
-**版本**: 1.0.0
+## Related Documentation
+
+- [Troubleshooting Guide](./TROUBLESHOOTING.md)
+- [Disaster Recovery Plan](./DISASTER_RECOVERY.md)
+- [Best Practices](./BEST_PRACTICES.md)
+- [API Documentation](./API.md)
+
+---
+
+**Last Updated**: 2024-01-15
+**Version**: 1.0.0

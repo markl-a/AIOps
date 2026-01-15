@@ -4,9 +4,10 @@ import asyncio
 import hashlib
 import json
 import time
-import pickle
 import os
 import threading
+import base64
+from datetime import datetime, date
 from typing import Any, Optional, Callable, Dict, List, TypeVar, Set, Union
 from pathlib import Path
 from functools import wraps
@@ -16,6 +17,134 @@ from aiops.core.logger import get_logger
 T = TypeVar('T')
 
 logger = get_logger(__name__)
+
+
+# =============================================================================
+# SECURITY FIX: JSON Serialization Helpers
+# =============================================================================
+# These helper functions replace pickle serialization with JSON to prevent
+# arbitrary code execution vulnerabilities (CWE-502: Deserialization of
+# Untrusted Data). Pickle can execute arbitrary Python code during
+# deserialization, making it dangerous when loading data from untrusted sources.
+# JSON is a safe alternative that only supports basic data types.
+# =============================================================================
+
+
+class JSONSerializationError(Exception):
+    """Raised when an object cannot be serialized to JSON."""
+    pass
+
+
+class JSONDeserializationError(Exception):
+    """Raised when JSON data cannot be deserialized."""
+    pass
+
+
+def _json_serialize(obj: Any) -> str:
+    """Safely serialize an object to JSON string.
+
+    Converts complex Python objects to JSON-serializable format.
+    Handles common types like datetime, bytes, sets, and custom objects.
+
+    Args:
+        obj: The object to serialize
+
+    Returns:
+        JSON string representation of the object
+
+    Raises:
+        JSONSerializationError: If the object cannot be serialized
+
+    Security Note:
+        This function replaces pickle.dumps() to prevent arbitrary code
+        execution vulnerabilities during deserialization.
+    """
+    def default_encoder(o: Any) -> Any:
+        """Custom JSON encoder for non-standard types."""
+        if isinstance(o, datetime):
+            return {"__type__": "datetime", "value": o.isoformat()}
+        elif isinstance(o, date):
+            return {"__type__": "date", "value": o.isoformat()}
+        elif isinstance(o, bytes):
+            # Encode bytes as base64 for safe JSON storage
+            return {"__type__": "bytes", "value": base64.b64encode(o).decode('ascii')}
+        elif isinstance(o, set):
+            return {"__type__": "set", "value": list(o)}
+        elif isinstance(o, frozenset):
+            return {"__type__": "frozenset", "value": list(o)}
+        elif hasattr(o, '__dict__'):
+            # Handle custom objects by storing their dict representation
+            return {
+                "__type__": "object",
+                "__class__": f"{o.__class__.__module__}.{o.__class__.__name__}",
+                "value": o.__dict__
+            }
+        else:
+            raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
+    try:
+        return json.dumps(obj, default=default_encoder, ensure_ascii=False)
+    except (TypeError, ValueError) as e:
+        raise JSONSerializationError(f"Failed to serialize object: {e}") from e
+
+
+def _json_deserialize(data: str) -> Any:
+    """Safely deserialize a JSON string to Python object.
+
+    Reconstructs Python objects from JSON, handling special type markers
+    for datetime, bytes, sets, etc.
+
+    Args:
+        data: JSON string to deserialize
+
+    Returns:
+        Deserialized Python object
+
+    Raises:
+        JSONDeserializationError: If the data cannot be deserialized
+
+    Security Note:
+        This function replaces pickle.loads() to prevent arbitrary code
+        execution. Unlike pickle, JSON deserialization cannot execute
+        arbitrary code, making it safe for untrusted data.
+
+        Note: Custom objects are returned as dictionaries rather than
+        being reconstructed, as reconstructing arbitrary classes would
+        reintroduce security risks.
+    """
+    def object_hook(d: Dict) -> Any:
+        """Custom JSON decoder for special type markers."""
+        if "__type__" not in d:
+            return d
+
+        type_marker = d["__type__"]
+        value = d.get("value")
+
+        if type_marker == "datetime":
+            return datetime.fromisoformat(value)
+        elif type_marker == "date":
+            return date.fromisoformat(value)
+        elif type_marker == "bytes":
+            return base64.b64decode(value.encode('ascii'))
+        elif type_marker == "set":
+            return set(value)
+        elif type_marker == "frozenset":
+            return frozenset(value)
+        elif type_marker == "object":
+            # SECURITY: Do not reconstruct arbitrary classes - return dict instead
+            # Reconstructing classes could allow code execution through __init__
+            logger.debug(
+                f"Custom object of class '{d.get('__class__', 'unknown')}' "
+                "deserialized as dictionary for security"
+            )
+            return value
+        else:
+            return d
+
+    try:
+        return json.loads(data, object_hook=object_hook)
+    except (json.JSONDecodeError, ValueError, TypeError) as e:
+        raise JSONDeserializationError(f"Failed to deserialize JSON data: {e}") from e
 
 # Global lock manager for cache stampede prevention with bounded size
 # Using a maximum size to prevent unbounded memory growth
@@ -240,14 +369,27 @@ class RedisBackend(CacheBackend):
         return f"{self.prefix}:{key}"
 
     def get(self, key: str) -> Optional[Any]:
-        """Get value from Redis with automatic reconnection."""
+        """Get value from Redis with automatic reconnection.
+
+        Security Note:
+            Uses JSON deserialization instead of pickle to prevent arbitrary
+            code execution vulnerabilities (CWE-502).
+        """
         if not self._ensure_connection() or self.client is None:
             return None
 
         try:
             value = self.client.get(self._make_key(key))
             if value:
-                return pickle.loads(value)
+                # SECURITY FIX: Use JSON instead of pickle to prevent code execution
+                # pickle.loads() can execute arbitrary code during deserialization
+                try:
+                    return _json_deserialize(value.decode('utf-8'))
+                except JSONDeserializationError as e:
+                    logger.warning(f"Failed to deserialize cached value for key {key[:8]}...: {e}")
+                    # Delete corrupted/incompatible cache entry
+                    self.delete(key)
+                    return None
             return None
         except Exception as e:
             logger.error(f"Redis get error: {e}")
@@ -256,12 +398,24 @@ class RedisBackend(CacheBackend):
             return None
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None):
-        """Set value in Redis with automatic reconnection."""
+        """Set value in Redis with automatic reconnection.
+
+        Security Note:
+            Uses JSON serialization instead of pickle to ensure safe
+            deserialization without arbitrary code execution risks.
+        """
         if not self._ensure_connection() or self.client is None:
             return
 
         try:
-            serialized = pickle.dumps(value)
+            # SECURITY FIX: Use JSON instead of pickle to prevent code execution
+            # pickle.dumps() creates data that can execute code when deserialized
+            try:
+                serialized = _json_serialize(value).encode('utf-8')
+            except JSONSerializationError as e:
+                logger.error(f"Failed to serialize value for cache key {key[:8]}...: {e}")
+                return
+
             if ttl:
                 self.client.setex(self._make_key(key), ttl, serialized)
             else:
@@ -393,14 +547,29 @@ class FileBackend(CacheBackend):
         return self.cache_dir / f"{key}.cache"
 
     def get(self, key: str) -> Optional[Any]:
-        """Get value from file cache."""
+        """Get value from file cache.
+
+        Security Note:
+            Uses JSON deserialization instead of pickle to prevent arbitrary
+            code execution vulnerabilities (CWE-502).
+        """
         cache_path = self._get_cache_path(key)
         if not cache_path.exists():
             return None
 
         try:
-            with open(cache_path, "rb") as f:
-                data = pickle.load(f)
+            # SECURITY FIX: Use JSON instead of pickle to prevent code execution
+            # pickle.load() can execute arbitrary code during deserialization
+            with open(cache_path, "r", encoding="utf-8") as f:
+                json_data = f.read()
+
+            try:
+                data = _json_deserialize(json_data)
+            except JSONDeserializationError as e:
+                logger.warning(f"Failed to deserialize cached file {cache_path}: {e}")
+                # Delete corrupted/incompatible cache file
+                cache_path.unlink()
+                return None
 
             # Check expiration
             if "expires_at" in data and data["expires_at"]:

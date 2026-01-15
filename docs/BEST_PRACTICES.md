@@ -1,93 +1,93 @@
-# AIOps 最佳實踐指南
+# AIOps Best Practices Guide
 
-本文檔提供 AIOps 專案的最佳實踐和使用建議，幫助你充分發揮系統能力並避免常見陷阱。
+This document provides best practices and usage recommendations for the AIOps project to help you maximize the system's capabilities and avoid common pitfalls.
 
-## 目錄
+## Table of Contents
 
-- [架構設計](#架構設計)
-- [安全最佳實踐](#安全最佳實踐)
-- [性能優化](#性能優化)
-- [成本控制](#成本控制)
-- [開發流程](#開發流程)
-- [運維管理](#運維管理)
-- [監控和告警](#監控和告警)
+- [Architecture Design](#architecture-design)
+- [Security Best Practices](#security-best-practices)
+- [Performance Optimization](#performance-optimization)
+- [Cost Control](#cost-control)
+- [Development Process](#development-process)
+- [Operations Management](#operations-management)
+- [Monitoring and Alerting](#monitoring-and-alerting)
 
 ---
 
-## 架構設計
+## Architecture Design
 
-### 1. 微服務分離
+### 1. Microservices Separation
 
-✅ **推薦做法**:
+**Recommended**:
 ```yaml
-# 分離 API 和 Worker
+# Separate API and Worker
 services:
   aiops-api:
-    # 處理 HTTP 請求
+    # Handle HTTP requests
   aiops-worker:
-    # 處理異步任務
+    # Handle asynchronous tasks
   aiops-beat:
-    # 定時任務調度
+    # Scheduled task scheduling
 ```
 
-❌ **避免**:
-- 在 API 進程中執行長時間運行的任務
-- 混合同步和異步處理邏輯
+**Avoid**:
+- Executing long-running tasks in the API process
+- Mixing synchronous and asynchronous processing logic
 
-### 2. 無狀態設計
+### 2. Stateless Design
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
-# 使用外部狀態存儲
+# Use external state storage
 from aiops.database import get_db
 
 def process_request(request_id):
-    # 從數據庫讀取狀態
+    # Read state from database
     db = next(get_db())
     state = db.query(State).filter_by(id=request_id).first()
 ```
 
-❌ **避免**:
-- 在內存中存儲用戶會話
-- 依賴本地文件系統
+**Avoid**:
+- Storing user sessions in memory
+- Relying on the local filesystem
 
-### 3. 優雅降級
+### 3. Graceful Degradation
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
 from aiops.core.exceptions import LLMProviderError
 
 try:
     result = await agent.execute(code=code)
 except LLMProviderError:
-    # 降級到簡單規則引擎
+    # Fall back to simple rule engine
     result = fallback_analysis(code)
 ```
 
 ---
 
-## 安全最佳實踐
+## Security Best Practices
 
-### 1. API 密鑰管理
+### 1. API Key Management
 
-✅ **推薦做法**:
+**Recommended**:
 ```bash
-# 使用 Kubernetes Secrets
+# Use Kubernetes Secrets
 kubectl create secret generic aiops-secrets \
   --from-literal=openai-api-key=$OPENAI_KEY
 
-# 使用環境變量
+# Use environment variables
 export OPENAI_API_KEY=$(cat /run/secrets/openai-key)
 ```
 
-❌ **避免**:
-- 在代碼中硬編碼 API 密鑰
-- 將密鑰提交到 Git
-- 在日誌中打印密鑰
+**Avoid**:
+- Hardcoding API keys in code
+- Committing keys to Git
+- Printing keys in logs
 
-### 2. 最小權限原則
+### 2. Principle of Least Privilege
 
-✅ **推薦做法**:
+**Recommended**:
 ```yaml
 # Pod Security Context
 securityContext:
@@ -97,9 +97,9 @@ securityContext:
   readOnlyRootFilesystem: true
 ```
 
-### 3. 輸入驗證
+### 3. Input Validation
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
 from pydantic import BaseModel, validator
 
@@ -114,58 +114,58 @@ class CodeReviewRequest(BaseModel):
         return v
 ```
 
-### 4. 速率限制
+### 4. Rate Limiting
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
-# 多層速率限制
-# 1. API 級別
+# Multi-layer rate limiting
+# 1. API level
 from slowapi import Limiter
 limiter = Limiter(key_func=get_remote_address)
 
-# 2. 用戶級別
+# 2. User level
 @app.get("/analyze")
 @limiter.limit("10/minute")
 async def analyze():
     ...
 
-# 3. LLM 級別
-await asyncio.sleep(1.0)  # 避免過快調用
+# 3. LLM level
+await asyncio.sleep(1.0)  # Avoid calling too quickly
 ```
 
-### 5. 數據加密
+### 5. Data Encryption
 
-✅ **推薦做法**:
-- 傳輸加密: 啟用 TLS/SSL
-- 靜態加密: 加密數據庫備份
-- 密鑰輪換: 定期更換 API 密鑰
+**Recommended**:
+- Transport encryption: Enable TLS/SSL
+- At-rest encryption: Encrypt database backups
+- Key rotation: Regularly rotate API keys
 
 ---
 
-## 性能優化
+## Performance Optimization
 
-### 1. 緩存策略
+### 1. Caching Strategy
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
 from aiops.core.cache import cache
 
-@cache(ttl=3600)  # 緩存 1 小時
+@cache(ttl=3600)  # Cache for 1 hour
 async def get_code_analysis(code_hash):
-    # 昂貴的 LLM 調用
+    # Expensive LLM call
     return await llm.analyze(code)
 ```
 
-**緩存層次**:
-1. **應用層緩存** (Redis): 用於 LLM 響應
-2. **數據庫緩存** (查詢緩存): 用於頻繁查詢
-3. **CDN 緩存**: 用於靜態資源
+**Cache Layers**:
+1. **Application Layer Cache** (Redis): For LLM responses
+2. **Database Cache** (Query Cache): For frequent queries
+3. **CDN Cache**: For static resources
 
-### 2. 批量處理
+### 2. Batch Processing
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
-# 批量處理文件
+# Batch process files
 from celery import group
 
 tasks = [
@@ -176,11 +176,11 @@ job = group(tasks)
 result = job.apply_async()
 ```
 
-### 3. 連接池管理
+### 3. Connection Pool Management
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
-# 數據庫連接池
+# Database connection pool
 engine = create_engine(
     DATABASE_URL,
     pool_size=20,
@@ -189,7 +189,7 @@ engine = create_engine(
     pool_recycle=3600,
 )
 
-# Redis 連接池
+# Redis connection pool
 redis_pool = redis.ConnectionPool(
     host='localhost',
     port=6379,
@@ -197,11 +197,11 @@ redis_pool = redis.ConnectionPool(
 )
 ```
 
-### 4. 異步處理
+### 4. Asynchronous Processing
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
-# 使用異步 I/O
+# Use asynchronous I/O
 import asyncio
 
 async def process_multiple_files(files):
@@ -210,11 +210,11 @@ async def process_multiple_files(files):
     return results
 ```
 
-### 5. 資源限制
+### 5. Resource Limits
 
-✅ **推薦做法**:
+**Recommended**:
 ```yaml
-# Kubernetes 資源限制
+# Kubernetes resource limits
 resources:
   requests:
     memory: "512Mi"
@@ -226,11 +226,11 @@ resources:
 
 ---
 
-## 成本控制
+## Cost Control
 
-### 1. Token 預算管理
+### 1. Token Budget Management
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
 from aiops.core.config import Config
 
@@ -241,37 +241,37 @@ config = Config(
 )
 ```
 
-### 2. 模型選擇策略
+### 2. Model Selection Strategy
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
-# 根據任務複雜度選擇模型
+# Select model based on task complexity
 def select_model(task_complexity):
     if task_complexity == "simple":
-        return "gpt-3.5-turbo"  # 便宜快速
+        return "gpt-3.5-turbo"  # Cheap and fast
     elif task_complexity == "medium":
         return "gpt-4-turbo-preview"
     else:
-        return "claude-3-opus"  # 最強但貴
+        return "claude-3-opus"  # Most powerful but expensive
 ```
 
-### 3. 成本監控
+### 3. Cost Monitoring
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
-# 啟用成本追蹤
+# Enable cost tracking
 from aiops.observability.metrics import llm_cost_total
 
-# 設置成本告警
+# Set cost alerts
 if daily_cost > budget_limit:
     send_alert("Daily LLM budget exceeded")
 ```
 
-### 4. 緩存復用
+### 4. Cache Reuse
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
-# 對相同代碼的分析結果復用
+# Reuse analysis results for identical code
 code_hash = hashlib.sha256(code.encode()).hexdigest()
 cached_result = cache.get(f"analysis:{code_hash}")
 if cached_result:
@@ -280,71 +280,71 @@ if cached_result:
 
 ---
 
-## 開發流程
+## Development Process
 
-### 1. 代碼審查檢查清單
+### 1. Code Review Checklist
 
-在提交代碼前檢查：
+Check before submitting code:
 
-- [ ] 是否添加了單元測試
-- [ ] 是否更新了文檔
-- [ ] 是否處理了錯誤情況
-- [ ] 是否添加了日誌記錄
-- [ ] 是否進行了安全審查
-- [ ] 是否考慮了性能影響
-- [ ] 是否符合代碼風格
+- [ ] Unit tests added
+- [ ] Documentation updated
+- [ ] Error cases handled
+- [ ] Logging added
+- [ ] Security review completed
+- [ ] Performance impact considered
+- [ ] Code style compliance verified
 
-### 2. Git 分支策略
+### 2. Git Branch Strategy
 
-✅ **推薦做法**:
+**Recommended**:
 ```bash
-# 功能分支
+# Feature branch
 git checkout -b feature/new-agent
 git push origin feature/new-agent
 
-# PR 合並前確保
-- 所有測試通過
-- CI/CD 檢查通過
-- Code Review 完成
+# Before PR merge ensure
+- All tests pass
+- CI/CD checks pass
+- Code review completed
 ```
 
-### 3. 版本管理
+### 3. Version Management
 
-✅ **推薦做法**:
-- 使用語義化版本 (Semantic Versioning)
-- 維護 CHANGELOG.md
-- 對重大更改提供遷移指南
+**Recommended**:
+- Use Semantic Versioning
+- Maintain CHANGELOG.md
+- Provide migration guides for major changes
 
-### 4. 測試策略
+### 4. Testing Strategy
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
-# 測試金字塔
-# 70% - 單元測試
+# Testing pyramid
+# 70% - Unit tests
 def test_agent_validation():
     agent = CodeReviewAgent()
     with pytest.raises(ValidationError):
         agent.execute(code="")
 
-# 20% - 集成測試
+# 20% - Integration tests
 def test_api_workflow():
     response = client.post("/api/v1/code-review", ...)
     assert response.status_code == 200
 
-# 10% - E2E 測試
+# 10% - E2E tests
 def test_complete_analysis_pipeline():
-    # 測試完整流程
+    # Test complete workflow
 ```
 
 ---
 
-## 運維管理
+## Operations Management
 
-### 1. 部署策略
+### 1. Deployment Strategy
 
-✅ **推薦做法**:
+**Recommended**:
 
-**滾動更新**:
+**Rolling Update**:
 ```yaml
 strategy:
   type: RollingUpdate
@@ -353,37 +353,37 @@ strategy:
     maxUnavailable: 0
 ```
 
-**金絲雀部署**:
+**Canary Deployment**:
 ```bash
-# 首先部署 10% 流量
+# First deploy to 10% traffic
 kubectl set image deployment/aiops-api api=aiops:v2.0 -n aiops
 kubectl scale deployment/aiops-api-canary --replicas=1 -n aiops
 
-# 監控指標，如果正常則全量部署
+# Monitor metrics, if normal then full deployment
 ```
 
-### 2. 數據庫遷移
+### 2. Database Migration
 
-✅ **推薦做法**:
+**Recommended**:
 ```bash
-# 1. 備份數據庫
+# 1. Backup database
 pg_dump -h localhost -U aiops aiops > backup.sql
 
-# 2. 運行遷移（在維護窗口）
+# 2. Run migration (during maintenance window)
 alembic upgrade head
 
-# 3. 驗證遷移
+# 3. Verify migration
 alembic current
 
-# 4. 如有問題，回滾
+# 4. If issues, rollback
 alembic downgrade -1
 ```
 
-### 3. 日誌管理
+### 3. Log Management
 
-✅ **推薦做法**:
+**Recommended**:
 ```python
-# 結構化日誌
+# Structured logging
 from aiops.core.structured_logger import get_structured_logger
 
 log = get_structured_logger(__name__)
@@ -395,19 +395,19 @@ log.info(
 )
 ```
 
-**日誌保留策略**:
-- ERROR 日誌: 90 天
-- INFO 日誌: 30 天
-- DEBUG 日誌: 7 天
+**Log Retention Policy**:
+- ERROR logs: 90 days
+- INFO logs: 30 days
+- DEBUG logs: 7 days
 
-### 4. 備份策略
+### 4. Backup Strategy
 
-✅ **推薦做法**:
+**Recommended**:
 
-**3-2-1 原則**:
-- 3 個備份副本
-- 2 種不同介質
-- 1 個異地備份
+**3-2-1 Rule**:
+- 3 backup copies
+- 2 different media types
+- 1 offsite backup
 
 ```yaml
 # Kubernetes CronJob
@@ -416,7 +416,7 @@ kind: CronJob
 metadata:
   name: daily-backup
 spec:
-  schedule: "0 2 * * *"  # 每天凌晨 2 點
+  schedule: "0 2 * * *"  # Daily at 2 AM
   jobTemplate:
     spec:
       template:
@@ -429,93 +429,93 @@ spec:
 
 ---
 
-## 監控和告警
+## Monitoring and Alerting
 
-### 1. 關鍵指標監控
+### 1. Key Metrics Monitoring
 
-✅ **推薦監控**:
+**Recommended Monitoring**:
 
-**服務健康**:
-- API 可用性 (>99.9%)
-- 響應時間 (P95 < 1s)
-- 錯誤率 (< 0.1%)
+**Service Health**:
+- API availability (>99.9%)
+- Response time (P95 < 1s)
+- Error rate (< 0.1%)
 
-**資源使用**:
-- CPU 使用率 (< 70%)
-- 內存使用率 (< 80%)
-- 磁盤使用率 (< 80%)
+**Resource Usage**:
+- CPU usage (< 70%)
+- Memory usage (< 80%)
+- Disk usage (< 80%)
 
-**業務指標**:
-- LLM 調用次數
-- LLM 成本
-- 活躍用戶數
-- 任務隊列長度
+**Business Metrics**:
+- LLM call count
+- LLM cost
+- Active users
+- Task queue length
 
-### 2. 告警規則
+### 2. Alert Rules
 
-✅ **推薦告警**:
+**Recommended Alerts**:
 
 ```yaml
-# Prometheus 告警規則
+# Prometheus alert rules
 groups:
   - name: aiops_alerts
     rules:
-      # API 錯誤率過高
+      # High API error rate
       - alert: HighErrorRate
         expr: rate(aiops_errors_total[5m]) > 0.01
         for: 5m
         annotations:
           summary: "High error rate detected"
 
-      # LLM 成本超標
+      # LLM cost exceeded
       - alert: HighLLMCost
         expr: aiops_llm_cost_total > 500
         annotations:
           summary: "Daily LLM cost exceeded $500"
 
-      # 數據庫連接池耗盡
+      # Database connection pool exhausted
       - alert: DBConnectionPoolExhausted
         expr: aiops_db_connections_active >= aiops_db_connections_total
         for: 2m
 ```
 
-### 3. SLO/SLA 定義
+### 3. SLO/SLA Definition
 
-✅ **推薦 SLO**:
+**Recommended SLOs**:
 
-| 指標 | 目標 |
-|------|------|
-| API 可用性 | 99.9% |
-| API 響應時間 (P95) | < 1s |
-| API 響應時間 (P99) | < 3s |
-| 數據持久性 | 99.999% |
-| 任務處理時間 | 95% 在 5 分鐘內 |
+| Metric | Target |
+|--------|--------|
+| API Availability | 99.9% |
+| API Response Time (P95) | < 1s |
+| API Response Time (P99) | < 3s |
+| Data Durability | 99.999% |
+| Task Processing Time | 95% within 5 minutes |
 
 ---
 
-## 常見陷阱
+## Common Pitfalls
 
-### ❌ 避免的做法
+### Practices to Avoid
 
-1. **不要在循環中調用 LLM**
+1. **Do not call LLM in a loop**
 ```python
-# ❌ 錯誤
+# Wrong
 for file in files:
-    await llm.analyze(file)  # 很慢很貴
+    await llm.analyze(file)  # Slow and expensive
 
-# ✅ 正確
-await batch_analyze(files)  # 使用批量處理
+# Correct
+await batch_analyze(files)  # Use batch processing
 ```
 
-2. **不要忽略錯誤**
+2. **Do not ignore errors**
 ```python
-# ❌ 錯誤
+# Wrong
 try:
     result = await agent.execute()
 except:
-    pass  # 靜默失敗
+    pass  # Silent failure
 
-# ✅ 正確
+# Correct
 try:
     result = await agent.execute()
 except AgentError as e:
@@ -523,80 +523,80 @@ except AgentError as e:
     return fallback_result
 ```
 
-3. **不要阻塞事件循環**
+3. **Do not block the event loop**
 ```python
-# ❌ 錯誤
+# Wrong
 def sync_heavy_work():
-    time.sleep(10)  # 阻塞
+    time.sleep(10)  # Blocking
 
-# ✅ 正確
+# Correct
 async def async_heavy_work():
-    await asyncio.sleep(10)  # 非阻塞
+    await asyncio.sleep(10)  # Non-blocking
 ```
 
-4. **不要過度緩存**
+4. **Do not over-cache**
 ```python
-# ❌ 錯誤
-@cache(ttl=86400 * 365)  # 緩存 1 年
+# Wrong
+@cache(ttl=86400 * 365)  # Cache for 1 year
 async def get_security_scan():
-    ...  # 安全掃描結果應該經常更新
+    ...  # Security scan results should be updated frequently
 
-# ✅ 正確
-@cache(ttl=3600)  # 緩存 1 小時
+# Correct
+@cache(ttl=3600)  # Cache for 1 hour
 ```
 
 ---
 
-## 檢查清單
+## Checklists
 
-### 生產部署檢查清單
+### Production Deployment Checklist
 
-在生產環境部署前確保：
+Ensure before deploying to production:
 
-#### 安全
-- [ ] 所有密鑰使用 Secrets 管理
-- [ ] 啟用 TLS/SSL
-- [ ] 配置防火牆規則
-- [ ] 啟用速率限制
-- [ ] 配置 CORS 白名單
+#### Security
+- [ ] All secrets managed using Secrets
+- [ ] TLS/SSL enabled
+- [ ] Firewall rules configured
+- [ ] Rate limiting enabled
+- [ ] CORS whitelist configured
 
-#### 可靠性
-- [ ] 配置健康檢查
-- [ ] 配置就緒檢查
-- [ ] 設置資源限制
-- [ ] 配置自動擴展 (HPA)
-- [ ] 設置備份策略
+#### Reliability
+- [ ] Health checks configured
+- [ ] Readiness checks configured
+- [ ] Resource limits set
+- [ ] Auto scaling (HPA) configured
+- [ ] Backup strategy set
 
-#### 監控
-- [ ] 配置 Prometheus 指標
-- [ ] 設置 Grafana 儀表板
-- [ ] 配置告警規則
-- [ ] 啟用分佈式追蹤
-- [ ] 配置日誌聚合
+#### Monitoring
+- [ ] Prometheus metrics configured
+- [ ] Grafana dashboards set up
+- [ ] Alert rules configured
+- [ ] Distributed tracing enabled
+- [ ] Log aggregation configured
 
-#### 性能
-- [ ] 啟用緩存
-- [ ] 優化數據庫索引
-- [ ] 配置連接池
-- [ ] 啟用 CDN
-- [ ] 壓縮響應
+#### Performance
+- [ ] Caching enabled
+- [ ] Database indexes optimized
+- [ ] Connection pools configured
+- [ ] CDN enabled
+- [ ] Response compression enabled
 
-#### 數據
-- [ ] 運行數據庫遷移
-- [ ] 驗證數據完整性
-- [ ] 測試備份恢復
-- [ ] 配置數據保留策略
-
----
-
-## 相關資源
-
-- [部署指南](./DEPLOYMENT.md)
-- [故障排查](./TROUBLESHOOTING.md)
-- [API 文檔](./API.md)
-- [架構文檔](../ARCHITECTURE.md)
+#### Data
+- [ ] Database migrations run
+- [ ] Data integrity verified
+- [ ] Backup restore tested
+- [ ] Data retention policy configured
 
 ---
 
-**更新日期**: 2024-01-15
-**版本**: 1.0.0
+## Related Resources
+
+- [Deployment Guide](./DEPLOYMENT.md)
+- [Troubleshooting](./TROUBLESHOOTING.md)
+- [API Documentation](./API.md)
+- [Architecture Documentation](../ARCHITECTURE.md)
+
+---
+
+**Last Updated**: 2024-01-15
+**Version**: 1.0.0

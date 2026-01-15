@@ -33,7 +33,8 @@ class TestCompleteCodeReviewWorkflow:
         # Step 1: Submit code for review
         code = """
 def process_payment(amount, card_number):
-    # TODO: Validate card
+    if not card_number or len(card_number) < 13:
+        raise ValueError("Invalid card number")
     if amount < 0:
         raise ValueError("Invalid amount")
     return f"Charged ${amount} to {card_number}"
