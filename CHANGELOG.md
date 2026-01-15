@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Comprehensive unit tests for 17 agents (535+ new tests):
+  - service_mesh_analyzer, sla_monitor, doc_generator, secret_scanner
+  - chaos_engineer, incident_response, dependency_analyzer, auto_fixer
+  - config_drift_detector, cicd_optimizer, iac_validator, code_quality
+  - migration_planner, intelligent_monitor, prompt_generator
+  - release_manager, container_security
+- All tests include edge cases, error handling, and async mock support
 - Comprehensive optimization and development enhancements
 - Project improvements and infrastructure enhancements
 - Performance benchmark suite with detailed metrics
@@ -19,11 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved error handling in multi-agent scenarios
 - Enhanced README with Phase 7 features
 - Updated project structure for better maintainability
+- Added debug logging to exception handlers for better troubleshooting
 
 ### Fixed
 - Multi-agent debugging critical issues
 - Configuration drift detection bugs
 - Memory leak in long-running agent tasks
+- Exception handlers now log debug information for easier troubleshooting
 
 ## [0.1.1] - 2025-01-20
 
