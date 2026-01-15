@@ -130,7 +130,8 @@ class RedisCache:
             try:
                 await self.connect()
                 return True
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Redis initial connection failed: {e}")
                 return False
 
         try:
@@ -143,7 +144,8 @@ class RedisCache:
             try:
                 await self.connect()
                 return True
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Redis reconnection failed: {e}")
                 return False
 
     async def disconnect(self):
