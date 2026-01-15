@@ -64,8 +64,8 @@ class ProjectScanner:
                     if lines > 0:
                         structure["files_by_type"][ext]["total_lines"] += lines
                         structure["total_lines"] += lines
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Could not count lines in {path}: {e}")
 
                 structure["total_files"] += 1
 
@@ -79,7 +79,8 @@ class ProjectScanner:
         try:
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 return len(f.readlines())
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Could not read file for line count: {e}")
             return 0
 
     def identify_project_type(self) -> Dict[str, Any]:
