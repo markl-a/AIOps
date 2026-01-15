@@ -97,12 +97,12 @@ class ContainerSecurityScanner:
         # Simulate vulnerability scan (in real implementation, integrate with Trivy/Snyk)
         if 'FROM ubuntu' in dockerfile_content or 'FROM debian' in dockerfile_content:
             vulnerabilities.append(Vulnerability(
-                cve_id="CVE-2024-XXXX",
+                cve_id="CVE-2024-5535",
                 severity="high",
                 package_name="openssl",
                 installed_version="1.1.1",
                 fixed_version="1.1.1w",
-                description="OpenSSL vulnerability - Update recommended",
+                description="OpenSSL SSL_select_next_proto buffer overread vulnerability",
                 cvss_score=7.5
             ))
 
