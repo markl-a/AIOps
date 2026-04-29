@@ -1,5 +1,19 @@
 # AIOps Framework
 
+> ## ⚠️ Status — consolidated into [Automation_with_AI](https://github.com/markl-a/Automation_with_AI)
+>
+> The AIOps / MLOps functionality from this repo (multi-provider LLM routing,
+> deployment templates, monitoring scaffolds, cost tracking) has been
+> consolidated into [Automation_with_AI](https://github.com/markl-a/Automation_with_AI),
+> which is now the canonical "applied automation + AIOps + MLOps" layer of
+> the [phantom-mesh](https://github.com/markl-a/phantom-mesh) ecosystem.
+>
+> 👉 **For active development, go to [Automation_with_AI](https://github.com/markl-a/Automation_with_AI).**
+>
+> This repo is preserved as a design reference and is not actively maintained.
+
+---
+
 <div align="center">
 
 **🤖 Enterprise-Grade AI-Powered DevOps Automation Platform**
